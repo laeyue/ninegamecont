@@ -3,9 +3,9 @@ set -e
 
 echo "=== Nine Game Container Startup ==="
 
-echo "Running database migrations..."
-prisma migrate deploy 2>&1 || {
-  echo "WARNING: prisma migrate deploy failed. Continuing — seed may create tables if needed."
+echo "Running database migration..."
+node docker-migrate.mjs 2>&1 || {
+  echo "WARNING: Migration failed. Continuing — app may not work correctly."
 }
 
 echo "Seeding database..."

@@ -35,20 +35,14 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-# Copy Prisma schema + migrations for migrate deploy at startup
-COPY --from=builder /app/prisma ./prisma
+# Copy migration SQL (for docker-migrate.mjs)
+COPY --from=builder /app/prisma/migrations ./prisma/migrations
 
-# Prisma v7 config + dotenv (needed by prisma migrate deploy)
-COPY --from=builder /app/prisma.config.ts ./
-COPY --from=builder /app/node_modules/dotenv ./node_modules/dotenv
-
-# Copy startup and seed scripts
+# Copy startup, migration, and seed scripts
 COPY docker-entrypoint.sh ./
+COPY docker-migrate.mjs ./
 COPY docker-seed.mjs ./
 RUN chmod +x docker-entrypoint.sh
-
-# Install prisma CLI for migrations at startup
-RUN npm install -g prisma@7
 
 USER nextjs
 
