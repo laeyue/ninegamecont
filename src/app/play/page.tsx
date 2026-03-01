@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useTeam } from "@/hooks/use-team";
 import { useMember } from "@/hooks/use-member";
 import { useSSE } from "@/hooks/use-sse";
+import { TutorialDialog } from "@/components/player/tutorial-dialog";
 import { TeamSelector } from "@/components/player/team-selector";
 import { MemberEntry } from "@/components/player/member-entry";
 import { Hud } from "@/components/player/hud";
@@ -19,6 +20,7 @@ import type { Member } from "@/hooks/use-member";
 
 export default function PlayPage() {
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [tutorialDone, setTutorialDone] = useState(false);
   const [newsItem, setNewsItem] = useState<NewsItem | null>(null);
   const newsIdCounter = useRef(0);
 
@@ -31,7 +33,13 @@ export default function PlayPage() {
   useEffect(() => {
     const stored = localStorage.getItem("selectedTeamId");
     if (stored) setSelectedTeamId(stored);
+    if (localStorage.getItem("tutorialDone")) setTutorialDone(true);
   }, []);
+
+  const handleTutorialComplete = () => {
+    setTutorialDone(true);
+    localStorage.setItem("tutorialDone", "1");
+  };
 
   const handleSelectTeam = (teamId: string) => {
     setSelectedTeamId(teamId);
@@ -105,6 +113,11 @@ export default function PlayPage() {
         </div>
       </div>
     );
+  }
+
+  // Step 0: show tutorial if not done yet and no team selected
+  if (!tutorialDone && !selectedTeamId) {
+    return <TutorialDialog onComplete={handleTutorialComplete} />;
   }
 
   // Step 1: pick a team
