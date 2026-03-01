@@ -22,6 +22,12 @@ export const MINE_COOLDOWN_MS: Partial<Record<Tier, number>> = {
   [Tier.SEMI_PERIPHERY]: 5000,
 };
 
+// ---------- Manufacture cooldowns (milliseconds) ----------
+export const MANUFACTURE_COOLDOWN_MS: Partial<Record<Tier, number>> = {
+  [Tier.CORE]: 5000,
+  [Tier.SEMI_PERIPHERY]: 8000,
+};
+
 // ---------- FDI tax rate ----------
 export const FDI_TAX_RATE = 0.5;
 
@@ -59,4 +65,8 @@ export function getMineCooldownMs(tier: Tier): number {
 
 export function getManufactureOutput(tier: Tier): number {
   return MANUFACTURE_OUTPUT[tier] ?? 30;
+}
+
+export function getManufactureCooldownMs(tier: Tier): number {
+  return MANUFACTURE_COOLDOWN_MS[tier] ?? 5000;
 }

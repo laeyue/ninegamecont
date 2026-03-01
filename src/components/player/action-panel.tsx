@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Pickaxe, Factory, Loader2, Skull } from "lucide-react";
 import type { TeamData, GameStateData } from "@/types";
 import type { MemberRole } from "@/hooks/use-member";
-import { canMine, canManufacture, getMineCooldownMs, getManufactureOutput } from "@/lib/game-config";
+import { canMine, canManufacture, getMineCooldownMs, getManufactureOutput, getManufactureCooldownMs } from "@/lib/game-config";
 import { getTierTheme, cn } from "@/lib/utils";
 import { useCooldown } from "@/hooks/use-cooldown";
 
@@ -19,17 +19,19 @@ export function ActionPanel({ team, gameState, role }: ActionPanelProps) {
   const isFrozen = gameState?.gameFrozen ?? false;
   const showMine = canMine(team.tier) && role === "MINER";
   const showManufacture = canManufacture(team.tier, team.techLevel) && role === "MANUFACTURER";
-  const cooldownMs = getMineCooldownMs(team.tier);
-  const { isOnCooldown, remainingMs, trigger: triggerCooldown } = useCooldown(cooldownMs);
+  const mineCooldownMs = getMineCooldownMs(team.tier);
+  const mfgCooldownMs = getManufactureCooldownMs(team.tier);
+  const { isOnCooldown: mineOnCooldown, remainingMs: mineRemainingMs, trigger: triggerMineCooldown } = useCooldown(mineCooldownMs);
+  const { isOnCooldown: mfgOnCooldown, remainingMs: mfgRemainingMs, trigger: triggerMfgCooldown } = useCooldown(mfgCooldownMs);
   const [mineLoading, setMineLoading] = useState(false);
   const [mfgLoading, setMfgLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleMine = async () => {
-    if (isFrozen || isOnCooldown || mineLoading) return;
+    if (isFrozen || mineOnCooldown || mineLoading) return;
     setError(null);
     setMineLoading(true);
-    triggerCooldown();
+    triggerMineCooldown();
 
     try {
       const res = await fetch("/api/game/mine", {
@@ -49,9 +51,10 @@ export function ActionPanel({ team, gameState, role }: ActionPanelProps) {
   };
 
   const handleManufacture = async () => {
-    if (isFrozen || mfgLoading || team.rawMaterials < 1) return;
+    if (isFrozen || mfgLoading || mfgOnCooldown || team.rawMaterials < 1) return;
     setError(null);
     setMfgLoading(true);
+    triggerMfgCooldown();
 
     try {
       const res = await fetch("/api/game/manufacture", {
@@ -92,19 +95,19 @@ export function ActionPanel({ team, gameState, role }: ActionPanelProps) {
         {showMine && (
           <button
             onClick={handleMine}
-            disabled={isFrozen || isOnCooldown || mineLoading}
+            disabled={isFrozen || mineOnCooldown || mineLoading}
             className={cn(
               "w-full relative overflow-hidden rounded-lg py-4 px-6 font-bold text-lg transition-all active:scale-[0.97]",
-              isFrozen || isOnCooldown
+              isFrozen || mineOnCooldown
                 ? "bg-gray-700 text-gray-500 cursor-not-allowed"
                 : theme.button
             )}
           >
             {/* Cooldown progress bar */}
-            {isOnCooldown && (
+            {mineOnCooldown && (
               <div
                 className="absolute inset-0 bg-white/10 transition-all"
-                style={{ width: `${((cooldownMs - remainingMs) / cooldownMs) * 100}%` }}
+                style={{ width: `${((mineCooldownMs - mineRemainingMs) / mineCooldownMs) * 100}%` }}
               />
             )}
             <div className="relative flex items-center justify-center gap-3">
@@ -114,8 +117,8 @@ export function ActionPanel({ team, gameState, role }: ActionPanelProps) {
                 <Pickaxe className="h-6 w-6" />
               )}
               <span>
-                {isOnCooldown
-                  ? `Mining... ${(remainingMs / 1000).toFixed(1)}s`
+                {mineOnCooldown
+                  ? `Mining... ${(mineRemainingMs / 1000).toFixed(1)}s`
                   : "Mine Resources"}
               </span>
             </div>
@@ -126,28 +129,38 @@ export function ActionPanel({ team, gameState, role }: ActionPanelProps) {
         {showManufacture ? (
           <button
             onClick={handleManufacture}
-            disabled={isFrozen || mfgLoading || team.rawMaterials < 1}
+            disabled={isFrozen || mfgLoading || mfgOnCooldown || team.rawMaterials < 1}
             className={cn(
-              "w-full rounded-lg py-4 px-6 font-bold text-lg transition-all active:scale-[0.97]",
-              isFrozen || team.rawMaterials < 1
+              "w-full relative overflow-hidden rounded-lg py-4 px-6 font-bold text-lg transition-all active:scale-[0.97]",
+              isFrozen || mfgOnCooldown || team.rawMaterials < 1
                 ? "bg-gray-700 text-gray-500 cursor-not-allowed"
                 : theme.button
             )}
           >
-            <div className="flex items-center justify-center gap-3">
+            {/* Cooldown progress bar */}
+            {mfgOnCooldown && (
+              <div
+                className="absolute inset-0 bg-white/10 transition-all"
+                style={{ width: `${((mfgCooldownMs - mfgRemainingMs) / mfgCooldownMs) * 100}%` }}
+              />
+            )}
+            <div className="relative flex items-center justify-center gap-3">
               {mfgLoading ? (
                 <Loader2 className="h-6 w-6 animate-spin" />
               ) : (
                 <Factory className="h-6 w-6" />
               )}
               <span>
-                Manufacture (+${getManufactureOutput(team.tier)}
-                {team.fdiInvestorId ? " / 50% taxed" : ""})
+                {mfgOnCooldown
+                  ? `Manufacturing... ${(mfgRemainingMs / 1000).toFixed(1)}s`
+                  : `Manufacture (+$${getManufactureOutput(team.tier)}${team.fdiInvestorId ? " / 50% taxed" : ""})`}
               </span>
             </div>
-            <div className="text-xs mt-1 opacity-70">
-              Costs 1 Raw Material
-            </div>
+            {!mfgOnCooldown && (
+              <div className="text-xs mt-1 opacity-70">
+                Costs 1 Raw Material
+              </div>
+            )}
           </button>
         ) : (
           role === "MANUFACTURER" && team.techLevel < 1 && (

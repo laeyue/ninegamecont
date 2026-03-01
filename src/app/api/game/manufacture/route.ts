@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sseBroadcaster, SSE_EVENTS } from "@/lib/sse";
-import { canManufacture, getManufactureOutput, FDI_TAX_RATE } from "@/lib/game-config";
+import { canManufacture, getManufactureOutput, getManufactureCooldownMs, FDI_TAX_RATE } from "@/lib/game-config";
 import { sabotageState } from "@/lib/sabotage-state";
 import type { ManufactureRequest } from "@/types";
 
 export const dynamic = 'force-dynamic';
+
+// In-memory cooldown tracking
+const lastManufactureTime = new Map<string, number>();
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,6 +32,32 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       );
     }
+
+    // Fetch team for cooldown check
+    const teamCheck = await prisma.team.findUnique({ where: { id: teamId } });
+    if (!teamCheck) {
+      return NextResponse.json(
+        { success: false, error: "Team not found" },
+        { status: 404 }
+      );
+    }
+
+    // Enforce manufacture cooldown (server-side)
+    const cooldownMs = getManufactureCooldownMs(teamCheck.tier);
+    const now = Date.now();
+    const lastTime = lastManufactureTime.get(teamId) ?? 0;
+    const elapsed = now - lastTime;
+
+    if (elapsed < cooldownMs) {
+      const remaining = Math.ceil((cooldownMs - elapsed) / 1000);
+      return NextResponse.json(
+        { success: false, error: `Cooldown: ${remaining}s remaining` },
+        { status: 429 }
+      );
+    }
+
+    // Record cooldown
+    lastManufactureTime.set(teamId, now);
 
     // Use transaction for atomicity
     const result = await prisma.$transaction(async (tx) => {
