@@ -36,6 +36,11 @@ export function useSSE(handlers: Record<string, SSEHandler>) {
       "event-log",
       "game-state-update",
       "game-reset",
+      "roles-rotated",
+      "embargo-imposed",
+      "espionage-result",
+      "strike-started",
+      "revolution",
     ];
 
     for (const eventType of eventTypes) {

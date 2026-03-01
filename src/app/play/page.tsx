@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTeam } from "@/hooks/use-team";
 import { useMember } from "@/hooks/use-member";
 import { useSSE } from "@/hooks/use-sse";
@@ -12,12 +12,20 @@ import { MarketPanel } from "@/components/player/market-panel";
 import { SabotagePanel } from "@/components/player/sabotage-panel";
 import { GameFrozen } from "@/components/player/game-frozen";
 import { GameWaiting } from "@/components/player/game-waiting";
+import { NewsFlash, type NewsItem } from "@/components/player/news-flash";
 import { getTierTheme } from "@/lib/utils";
 import { DEFAULT_TIMER_SECONDS } from "@/lib/game-config";
 import type { Member } from "@/hooks/use-member";
 
 export default function PlayPage() {
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [newsItem, setNewsItem] = useState<NewsItem | null>(null);
+  const newsIdCounter = useRef(0);
+
+  const pushNews = useCallback((headline: string, type: NewsItem["type"]) => {
+    newsIdCounter.current += 1;
+    setNewsItem({ id: String(newsIdCounter.current), headline, type });
+  }, []);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -39,12 +47,51 @@ export default function PlayPage() {
   const { team, allTeams, orders, gameState, loading } = useTeam(selectedTeamId);
   const { member, loading: memberLoading, error: memberError, join, leave, applyRoleRotation } = useMember(selectedTeamId);
 
-  // Listen for role rotations from the server
+  // Listen for SSE events — role rotations + news flash triggers
   useSSE({
     "roles-rotated": (data: unknown) => {
       const { teamId, members } = data as { teamId: string; members: Member[] };
       if (teamId === selectedTeamId) {
         applyRoleRotation(members);
+      }
+    },
+    "embargo-imposed": (data: unknown) => {
+      const d = data as { targetName: string; imposedByName: string };
+      pushNews(`${d.imposedByName} imposed a TRADE EMBARGO on ${d.targetName}!`, "sabotage");
+    },
+    "espionage-result": (data: unknown) => {
+      const d = data as { attackerName: string; targetName: string; succeeded: boolean };
+      if (d.succeeded) {
+        pushNews(`${d.attackerName} stole technology from ${d.targetName}!`, "sabotage");
+      } else {
+        pushNews(`${d.attackerName} failed to spy on ${d.targetName} and was fined!`, "sabotage");
+      }
+    },
+    "strike-started": (data: unknown) => {
+      const d = data as { teamName: string; investorName: string };
+      pushNews(`${d.teamName} called a WORKER STRIKE! ${d.investorName} loses money.`, "sabotage");
+    },
+    "revolution": (data: unknown) => {
+      const d = data as { teamName: string; investorName: string };
+      pushNews(`REVOLUTION! ${d.teamName} overthrew ${d.investorName}'s foreign control!`, "crisis");
+    },
+    "game-state-update": (data: unknown) => {
+      const d = data as { state: { gameFrozen: boolean } };
+      if (d.state.gameFrozen) {
+        pushNews("GAME ENDED — All trading has been frozen!", "system");
+      }
+    },
+    "event-log": (data: unknown) => {
+      const d = data as { log: { message: string } };
+      const msg = d.log.message;
+      if (msg.includes("FOREIGN DIRECT INVESTMENT")) {
+        // Strip emoji prefix for cleaner display
+        const clean = msg.replace(/^[^\w]*/, "").replace("FOREIGN DIRECT INVESTMENT — ", "");
+        pushNews(`FDI: ${clean}`, "diplomacy");
+      } else if (msg.includes("DEBT CRISIS")) {
+        pushNews("DEBT CRISIS! All Periphery nations have had their wealth halved!", "crisis");
+      } else if (msg.includes("Game resumed")) {
+        pushNews("Game has resumed — Trading is open!", "system");
       }
     },
   });
@@ -94,6 +141,9 @@ export default function PlayPage() {
 
   return (
     <div className={`min-h-screen ${theme.bg} relative`}>
+      {/* News Flash Banner */}
+      <NewsFlash item={newsItem} />
+
       {/* Pre-game waiting overlay */}
       {isPreGame && <GameWaiting team={team} memberName={member.name} />}
 
