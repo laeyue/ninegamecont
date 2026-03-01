@@ -42,7 +42,8 @@ COPY --from=builder /app/prisma/migrations ./prisma/migrations
 COPY docker-entrypoint.sh ./
 COPY docker-migrate.mjs ./
 COPY docker-seed.mjs ./
-RUN chmod +x docker-entrypoint.sh
+# Fix CRLF line endings (if built from Windows checkout) and make executable
+RUN sed -i 's/\r$//' docker-entrypoint.sh && chmod +x docker-entrypoint.sh
 
 USER nextjs
 
