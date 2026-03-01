@@ -11,7 +11,9 @@ import { ActionPanel } from "@/components/player/action-panel";
 import { MarketPanel } from "@/components/player/market-panel";
 import { SabotagePanel } from "@/components/player/sabotage-panel";
 import { GameFrozen } from "@/components/player/game-frozen";
+import { GameWaiting } from "@/components/player/game-waiting";
 import { getTierTheme } from "@/lib/utils";
+import { DEFAULT_TIMER_SECONDS } from "@/lib/game-config";
 import type { Member } from "@/hooks/use-member";
 
 export default function PlayPage() {
@@ -86,10 +88,17 @@ export default function PlayPage() {
 
   const theme = getTierTheme(team.tier);
 
+  // Pre-game: timer not started, full duration, not frozen
+  const isPreGame = !gameState?.timerRunning && !gameState?.gameFrozen
+    && (gameState?.timerSeconds ?? DEFAULT_TIMER_SECONDS) === DEFAULT_TIMER_SECONDS;
+
   return (
     <div className={`min-h-screen ${theme.bg} relative`}>
+      {/* Pre-game waiting overlay */}
+      {isPreGame && <GameWaiting team={team} memberName={member.name} />}
+
       {/* Game Frozen Overlay */}
-      {gameState?.gameFrozen && <GameFrozen team={team} allTeams={allTeams} />}
+      {!isPreGame && gameState?.gameFrozen && <GameFrozen team={team} allTeams={allTeams} />}
 
       {/* HUD */}
       <Hud
