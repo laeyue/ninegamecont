@@ -38,7 +38,7 @@ export const DEFAULT_TIMER_SECONDS = 1200; // 20 minutes
 export const EMBARGO_COST = 50;
 export const EMBARGO_DURATION_MS = 60_000; // 60 seconds
 export const ESPIONAGE_COST_ON_FAIL = 40;
-export const ESPIONAGE_SUCCESS_CHANCE = 0.4; // 40%
+export const ESPIONAGE_SUCCESS_CHANCE = 0.25; // 25%
 export const STRIKE_DURATION_MS = 30_000; // 30 seconds
 export const STRIKE_INVESTOR_PENALTY = 30; // Core investor loses $30
 export const REVOLUTION_WEALTH_THRESHOLD = 20; // wealth must be <= this

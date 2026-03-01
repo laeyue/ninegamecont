@@ -292,7 +292,7 @@ const slides = [
               <span className="text-gray-500 text-xs ml-auto">Periphery & Semi-P</span>
             </div>
             <p className="text-gray-400 text-xs">
-              40% chance to steal +1 Tech Level from a target. If you fail, you pay a $40 fine.
+              25% chance to steal +1 Tech Level from a target. If you fail, you pay a $40 fine.
             </p>
           </div>
 

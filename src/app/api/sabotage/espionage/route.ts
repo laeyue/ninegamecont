@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 // POST { attackerId, targetId, memberId }
 // Periphery or Semi-Periphery can attempt to steal +1 tech from a higher-tier team
-// 40% success, 60% failure (attacker pays $40 fine to target)
+// 25% success, 75% failure (attacker pays $40 fine to target)
 export async function POST(req: NextRequest) {
   try {
     const { attackerId, targetId, memberId } = await req.json();
