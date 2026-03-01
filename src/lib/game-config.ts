@@ -12,7 +12,7 @@ export const TIER_DEFAULTS: Record<
 
 // ---------- Manufacture outputs ----------
 export const MANUFACTURE_OUTPUT: Partial<Record<Tier, number>> = {
-  [Tier.CORE]: 50,
+  [Tier.CORE]: 80,
   [Tier.SEMI_PERIPHERY]: 30,
 };
 
