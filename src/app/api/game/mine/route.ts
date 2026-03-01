@@ -7,17 +7,17 @@ import type { MineRequest } from "@/types";
 
 export const dynamic = 'force-dynamic';
 
-// In-memory cooldown tracking to prevent DB thrashing
+// In-memory cooldown tracking per player
 const lastMineTime = new Map<string, number>();
 
 export async function POST(request: NextRequest) {
   try {
     const body: MineRequest = await request.json();
-    const { teamId } = body;
+    const { teamId, memberId } = body;
 
-    if (!teamId) {
+    if (!teamId || !memberId) {
       return NextResponse.json(
-        { success: false, error: "teamId is required" },
+        { success: false, error: "teamId and memberId are required" },
         { status: 400 }
       );
     }
@@ -60,10 +60,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Enforce cooldown (server-side debounce)
+    // Enforce cooldown (server-side per player)
     const cooldownMs = getMineCooldownMs(team.tier);
     const now = Date.now();
-    const lastTime = lastMineTime.get(teamId) ?? 0;
+    const lastTime = lastMineTime.get(memberId) ?? 0;
     const elapsed = now - lastTime;
 
     if (elapsed < cooldownMs) {
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Record cooldown
-    lastMineTime.set(teamId, now);
+    lastMineTime.set(memberId, now);
 
     // Update team
     const updated = await prisma.team.update({

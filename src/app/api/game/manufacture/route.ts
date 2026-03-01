@@ -13,11 +13,11 @@ const lastManufactureTime = new Map<string, number>();
 export async function POST(request: NextRequest) {
   try {
     const body: ManufactureRequest = await request.json();
-    const { teamId } = body;
+    const { teamId, memberId } = body;
 
-    if (!teamId) {
+    if (!teamId || !memberId) {
       return NextResponse.json(
-        { success: false, error: "teamId is required" },
+        { success: false, error: "teamId and memberId are required" },
         { status: 400 }
       );
     }
@@ -42,10 +42,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Enforce manufacture cooldown (server-side)
+    // Enforce manufacture cooldown (server-side per player)
     const cooldownMs = getManufactureCooldownMs(teamCheck.tier);
     const now = Date.now();
-    const lastTime = lastManufactureTime.get(teamId) ?? 0;
+    const lastTime = lastManufactureTime.get(memberId) ?? 0;
     const elapsed = now - lastTime;
 
     if (elapsed < cooldownMs) {
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Record cooldown
-    lastManufactureTime.set(teamId, now);
+    lastManufactureTime.set(memberId, now);
 
     // Use transaction for atomicity
     const result = await prisma.$transaction(async (tx) => {

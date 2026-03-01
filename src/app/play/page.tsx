@@ -112,7 +112,7 @@ export default function PlayPage() {
       {/* Main Content */}
       <main className="pt-[168px] pb-6 px-4 max-w-lg mx-auto space-y-4">
         {/* Actions */}
-        <ActionPanel team={team} gameState={gameState} role={member.role} />
+        <ActionPanel team={team} gameState={gameState} role={member.role} memberId={member.memberId} />
 
         {/* Sabotage (only for SABOTEUR role) */}
         {member.role === "SABOTEUR" && (

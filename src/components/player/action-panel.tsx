@@ -12,9 +12,10 @@ interface ActionPanelProps {
   team: TeamData;
   gameState: GameStateData | null;
   role: MemberRole;
+  memberId: string;
 }
 
-export function ActionPanel({ team, gameState, role }: ActionPanelProps) {
+export function ActionPanel({ team, gameState, role, memberId }: ActionPanelProps) {
   const theme = getTierTheme(team.tier);
   const isFrozen = gameState?.gameFrozen ?? false;
   const showMine = canMine(team.tier) && role === "MINER";
@@ -37,7 +38,7 @@ export function ActionPanel({ team, gameState, role }: ActionPanelProps) {
       const res = await fetch("/api/game/mine", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamId: team.id }),
+        body: JSON.stringify({ teamId: team.id, memberId }),
       });
       const data = await res.json();
       if (!data.success) {
@@ -60,7 +61,7 @@ export function ActionPanel({ team, gameState, role }: ActionPanelProps) {
       const res = await fetch("/api/game/manufacture", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamId: team.id }),
+        body: JSON.stringify({ teamId: team.id, memberId }),
       });
       const data = await res.json();
       if (!data.success) {

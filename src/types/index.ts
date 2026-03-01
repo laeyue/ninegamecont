@@ -47,10 +47,12 @@ export interface GameEventLogData {
 
 export interface MineRequest {
   teamId: string;
+  memberId: string;
 }
 
 export interface ManufactureRequest {
   teamId: string;
+  memberId: string;
 }
 
 export interface CreateOrderRequest {
