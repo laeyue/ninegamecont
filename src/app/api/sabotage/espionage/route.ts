@@ -3,16 +3,17 @@ import { prisma } from "@/lib/prisma";
 import { sseBroadcaster, SSE_EVENTS } from "@/lib/sse";
 import { sabotageState } from "@/lib/sabotage-state";
 import { ESPIONAGE_COST_ON_FAIL, ESPIONAGE_SUCCESS_CHANCE } from "@/lib/game-config";
+import { checkGameActive, checkMemberRole } from "@/lib/game-guards";
 import { Tier } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
-// POST { attackerId, targetId }
+// POST { attackerId, targetId, memberId }
 // Periphery or Semi-Periphery can attempt to steal +1 tech from a higher-tier team
 // 40% success, 60% failure (attacker pays $40 fine to target)
 export async function POST(req: NextRequest) {
   try {
-    const { attackerId, targetId } = await req.json();
+    const { attackerId, targetId, memberId } = await req.json();
 
     if (!attackerId || !targetId) {
       return NextResponse.json({ success: false, error: "attackerId and targetId required" }, { status: 400 });
@@ -21,10 +22,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Cannot spy on yourself" }, { status: 400 });
     }
 
-    // Check game frozen
-    const gameState = await prisma.gameState.findUnique({ where: { id: "singleton" } });
-    if (gameState?.gameFrozen) {
-      return NextResponse.json({ success: false, error: "Game is frozen" }, { status: 403 });
+    // Check game is active (not frozen, not pre-game)
+    const gameCheck = await checkGameActive();
+    if (gameCheck) return gameCheck;
+
+    // Check role (only SABOTEUR can sabotage)
+    if (memberId) {
+      const roleCheck = checkMemberRole(memberId, "SABOTEUR");
+      if (roleCheck) return roleCheck;
     }
 
     // Check sabotage cooldown

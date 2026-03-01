@@ -3,26 +3,31 @@ import { prisma } from "@/lib/prisma";
 import { sseBroadcaster, SSE_EVENTS } from "@/lib/sse";
 import { sabotageState } from "@/lib/sabotage-state";
 import { STRIKE_DURATION_MS, STRIKE_INVESTOR_PENALTY } from "@/lib/game-config";
+import { checkGameActive, checkMemberRole } from "@/lib/game-guards";
 import { Tier } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
-// POST { teamId }
+// POST { teamId, memberId }
 // Periphery team with FDI can call a worker strike:
 // - Disables own mining + manufacturing for 30s
 // - Costs the Core FDI investor $30
 export async function POST(req: NextRequest) {
   try {
-    const { teamId } = await req.json();
+    const { teamId, memberId } = await req.json();
 
     if (!teamId) {
       return NextResponse.json({ success: false, error: "teamId required" }, { status: 400 });
     }
 
-    // Check game frozen
-    const gameState = await prisma.gameState.findUnique({ where: { id: "singleton" } });
-    if (gameState?.gameFrozen) {
-      return NextResponse.json({ success: false, error: "Game is frozen" }, { status: 403 });
+    // Check game is active (not frozen, not pre-game)
+    const gameCheck = await checkGameActive();
+    if (gameCheck) return gameCheck;
+
+    // Check role (only SABOTEUR can sabotage)
+    if (memberId) {
+      const roleCheck = checkMemberRole(memberId, "SABOTEUR");
+      if (roleCheck) return roleCheck;
     }
 
     // Check sabotage cooldown

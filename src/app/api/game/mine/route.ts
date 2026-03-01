@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { sseBroadcaster, SSE_EVENTS } from "@/lib/sse";
 import { canMine, getMineCooldownMs } from "@/lib/game-config";
 import { sabotageState } from "@/lib/sabotage-state";
+import { checkGameActive, checkMemberRole } from "@/lib/game-guards";
 import type { MineRequest } from "@/types";
 
 export const dynamic = 'force-dynamic';
@@ -22,16 +23,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check game state
-    const gameState = await prisma.gameState.findUnique({
-      where: { id: "singleton" },
-    });
-    if (gameState?.gameFrozen) {
-      return NextResponse.json(
-        { success: false, error: "Game is frozen" },
-        { status: 403 }
-      );
-    }
+    // Check game is active (not frozen, not pre-game)
+    const gameCheck = await checkGameActive();
+    if (gameCheck) return gameCheck;
+
+    // Check role
+    const roleCheck = checkMemberRole(memberId, "MINER");
+    if (roleCheck) return roleCheck;
 
     // Fetch team
     const team = await prisma.team.findUnique({ where: { id: teamId } });

@@ -17,6 +17,7 @@ interface SabotagePanelProps {
   team: TeamData;
   allTeams: TeamData[];
   gameState: GameStateData | null;
+  memberId: string;
 }
 
 interface SabotageStatus {
@@ -24,7 +25,7 @@ interface SabotageStatus {
   strikes: { teamId: string; teamName: string; until: number }[];
 }
 
-export function SabotagePanel({ team, allTeams, gameState }: SabotagePanelProps) {
+export function SabotagePanel({ team, allTeams, gameState, memberId }: SabotagePanelProps) {
   const theme = getTierTheme(team.tier);
   const isFrozen = gameState?.gameFrozen ?? false;
 
@@ -81,7 +82,7 @@ export function SabotagePanel({ team, allTeams, gameState }: SabotagePanelProps)
       const res = await fetch("/api/sabotage/embargo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ attackerId: team.id, targetId }),
+        body: JSON.stringify({ attackerId: team.id, targetId, memberId }),
       });
       const data = await res.json();
       if (data.success) {
@@ -105,7 +106,7 @@ export function SabotagePanel({ team, allTeams, gameState }: SabotagePanelProps)
       const res = await fetch("/api/sabotage/espionage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ attackerId: team.id, targetId }),
+        body: JSON.stringify({ attackerId: team.id, targetId, memberId }),
       });
       const data = await res.json();
       if (data.success) {
@@ -129,7 +130,7 @@ export function SabotagePanel({ team, allTeams, gameState }: SabotagePanelProps)
       const res = await fetch("/api/sabotage/strike", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamId: team.id }),
+        body: JSON.stringify({ teamId: team.id, memberId }),
       });
       const data = await res.json();
       if (data.success) {
@@ -152,7 +153,7 @@ export function SabotagePanel({ team, allTeams, gameState }: SabotagePanelProps)
       const res = await fetch("/api/sabotage/revolution", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamId: team.id }),
+        body: JSON.stringify({ teamId: team.id, memberId }),
       });
       const data = await res.json();
       if (data.success) {

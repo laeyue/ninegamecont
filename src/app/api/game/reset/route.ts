@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { sseBroadcaster, SSE_EVENTS } from "@/lib/sse";
 import { TIER_DEFAULTS, DEFAULT_TIMER_SECONDS } from "@/lib/game-config";
 import { sabotageState } from "@/lib/sabotage-state";
+import { memberRegistry } from "@/lib/member-registry";
 import { Tier } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
@@ -68,14 +69,18 @@ export async function POST() {
     // Clear sabotage state (embargoes, strikes, cooldowns)
     sabotageState.clear();
 
+    // Clear member registry (roles, joined players)
+    memberRegistry.clear();
+
     // Broadcast reset
     sseBroadcaster.emit(SSE_EVENTS.GAME_RESET, {});
 
     return NextResponse.json({ success: true, data: { message: "Game reset successfully" } });
   } catch (error) {
-    console.error("POST /api/game/reset error:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("POST /api/game/reset error:", message, error);
     return NextResponse.json(
-      { success: false, error: "Failed to reset game" },
+      { success: false, error: `Failed to reset game: ${message}` },
       { status: 500 }
     );
   }

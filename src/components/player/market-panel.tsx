@@ -11,9 +11,10 @@ interface MarketPanelProps {
   orders: MarketOrderData[];
   gameState: GameStateData | null;
   role: MemberRole;
+  memberId: string;
 }
 
-export function MarketPanel({ team, orders, gameState, role }: MarketPanelProps) {
+export function MarketPanel({ team, orders, gameState, role, memberId }: MarketPanelProps) {
   const theme = getTierTheme(team.tier);
   const isFrozen = gameState?.gameFrozen ?? false;
   const [showSellForm, setShowSellForm] = useState(false);
@@ -44,7 +45,7 @@ export function MarketPanel({ team, orders, gameState, role }: MarketPanelProps)
 
       {/* Sell Form */}
       {showSellForm && canSell && (
-        <SellForm team={team} theme={theme} onClose={() => setShowSellForm(false)} />
+        <SellForm team={team} theme={theme} memberId={memberId} onClose={() => setShowSellForm(false)} />
       )}
 
       {/* Open Orders */}
@@ -61,6 +62,7 @@ export function MarketPanel({ team, orders, gameState, role }: MarketPanelProps)
               team={team}
               isFrozen={isFrozen}
               canBuy={canBuy}
+              memberId={memberId}
             />
           ))
         )}
@@ -72,10 +74,12 @@ export function MarketPanel({ team, orders, gameState, role }: MarketPanelProps)
 function SellForm({
   team,
   theme,
+  memberId,
   onClose,
 }: {
   team: TeamData;
   theme: ReturnType<typeof getTierTheme>;
+  memberId: string;
   onClose: () => void;
 }) {
   const [quantity, setQuantity] = useState(1);
@@ -95,6 +99,7 @@ function SellForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sellerId: team.id,
+          memberId,
           itemType: "RAW_MATERIAL",
           quantity,
           pricePerUnit,
@@ -170,11 +175,13 @@ function OrderCard({
   team,
   isFrozen,
   canBuy,
+  memberId,
 }: {
   order: MarketOrderData;
   team: TeamData;
   isFrozen: boolean;
   canBuy: boolean;
+  memberId: string;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -191,7 +198,7 @@ function OrderCard({
       const res = await fetch(`/api/market/${order.id}/buy`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ buyerId: team.id }),
+        body: JSON.stringify({ buyerId: team.id, memberId }),
       });
       const data = await res.json();
       if (!data.success) {

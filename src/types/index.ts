@@ -57,6 +57,7 @@ export interface ManufactureRequest {
 
 export interface CreateOrderRequest {
   sellerId: string;
+  memberId?: string;
   itemType: ItemType;
   quantity: number;
   pricePerUnit: number;
@@ -64,6 +65,7 @@ export interface CreateOrderRequest {
 
 export interface BuyOrderRequest {
   buyerId: string;
+  memberId?: string;
 }
 
 export interface CancelOrderRequest {

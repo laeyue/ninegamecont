@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sseBroadcaster, SSE_EVENTS } from "@/lib/sse";
 import { sabotageState } from "@/lib/sabotage-state";
+import { checkGameActive, checkMemberRole } from "@/lib/game-guards";
 import type { CreateOrderRequest } from "@/types";
 
 export const dynamic = 'force-dynamic';
@@ -43,7 +44,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body: CreateOrderRequest = await request.json();
-    const { sellerId, itemType, quantity, pricePerUnit } = body;
+    const { sellerId, memberId, itemType, quantity, pricePerUnit } = body;
 
     if (!sellerId || !itemType || !quantity || !pricePerUnit) {
       return NextResponse.json(
@@ -59,15 +60,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check game state
-    const gameState = await prisma.gameState.findUnique({
-      where: { id: "singleton" },
-    });
-    if (gameState?.gameFrozen) {
-      return NextResponse.json(
-        { success: false, error: "Game is frozen" },
-        { status: 403 }
-      );
+    // Check game is active (not frozen, not pre-game)
+    const gameCheck = await checkGameActive();
+    if (gameCheck) return gameCheck;
+
+    // Check role (only MINER can sell)
+    if (memberId) {
+      const roleCheck = checkMemberRole(memberId, "MINER");
+      if (roleCheck) return roleCheck;
     }
 
     // Use transaction: deduct materials (escrow) and create order

@@ -116,7 +116,7 @@ export default function PlayPage() {
 
         {/* Sabotage (only for SABOTEUR role) */}
         {member.role === "SABOTEUR" && (
-          <SabotagePanel team={team} allTeams={allTeams} gameState={gameState} />
+          <SabotagePanel team={team} allTeams={allTeams} gameState={gameState} memberId={member.memberId} />
         )}
 
         {/* Market */}
@@ -125,6 +125,7 @@ export default function PlayPage() {
           orders={orders}
           gameState={gameState}
           role={member.role}
+          memberId={member.memberId}
         />
       </main>
     </div>

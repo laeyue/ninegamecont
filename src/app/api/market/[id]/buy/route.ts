@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sseBroadcaster, SSE_EVENTS } from "@/lib/sse";
 import { sabotageState } from "@/lib/sabotage-state";
+import { checkGameActive, checkMemberRole } from "@/lib/game-guards";
 import type { BuyOrderRequest } from "@/types";
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +13,7 @@ export async function POST(
 ) {
   try {
     const body: BuyOrderRequest = await request.json();
-    const { buyerId } = body;
+    const { buyerId, memberId } = body;
     const orderId = params.id;
 
     if (!buyerId) {
@@ -22,15 +23,14 @@ export async function POST(
       );
     }
 
-    // Check game state
-    const gameState = await prisma.gameState.findUnique({
-      where: { id: "singleton" },
-    });
-    if (gameState?.gameFrozen) {
-      return NextResponse.json(
-        { success: false, error: "Game is frozen" },
-        { status: 403 }
-      );
+    // Check game is active (not frozen, not pre-game)
+    const gameCheck = await checkGameActive();
+    if (gameCheck) return gameCheck;
+
+    // Check role (only MANUFACTURER can buy)
+    if (memberId) {
+      const roleCheck = checkMemberRole(memberId, "MANUFACTURER");
+      if (roleCheck) return roleCheck;
     }
 
     // Transactional buy — prevents double-buy race conditions

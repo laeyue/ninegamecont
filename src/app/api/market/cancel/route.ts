@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sseBroadcaster, SSE_EVENTS } from "@/lib/sse";
+import { checkGameActive } from "@/lib/game-guards";
 import type { CancelOrderRequest } from "@/types";
 
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Check game is active (not frozen, not pre-game)
+    const gameCheck = await checkGameActive();
+    if (gameCheck) return gameCheck;
 
     const result = await prisma.$transaction(async (tx) => {
       const order = await tx.marketOrder.findUnique({ where: { id: orderId } });

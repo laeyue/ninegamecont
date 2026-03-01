@@ -81,6 +81,11 @@ class MemberRegistry {
     }
   }
 
+  /** Clear all members (used during game reset) */
+  clear(): void {
+    this.teams.clear();
+  }
+
   // Rotate roles within a team: shift everyone one slot forward in the role order
   rotateRoles(teamId: string, isCoreTeam: boolean): Member[] {
     const members = this.getTeamMembers(teamId);
