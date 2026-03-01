@@ -1,0 +1,8 @@
+{
+  "name": "Nine Game - Global Economy Simulation",
+  "short_name": "NineGame",
+  "start_url": "/play",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a"
+}

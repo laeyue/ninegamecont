@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Tier {
+  CORE
+  SEMI_PERIPHERY
+  PERIPHERY
+}
+
+enum ItemType {
+  RAW_MATERIAL
+  TECHNOLOGY
+}
+
+enum OrderStatus {
+  OPEN
+  COMPLETED
+  CANCELLED
+}
+
+model Team {
+  id           String  @id @default(uuid())
+  name         String  @unique
+  tier         Tier
+  wealth       Int
+  rawMaterials Int     @map("raw_materials")
+  techLevel    Int     @map("tech_level")
+
+  // FDI: which Core team extracts 50% of this team's manufacture profits
+  fdiInvestorId String? @map("fdi_investor_id")
+  fdiInvestor   Team?   @relation("FdiRelation", fields: [fdiInvestorId], references: [id])
+  fdiRecipients Team[]  @relation("FdiRelation")
+
+  sellOrders MarketOrder[] @relation("Seller")
+  buyOrders  MarketOrder[] @relation("Buyer")
+
+  @@map("teams")
+}
+
+model MarketOrder {
+  id           String      @id @default(uuid())
+  sellerId     String      @map("seller_id")
+  seller       Team        @relation("Seller", fields: [sellerId], references: [id])
+  buyerId      String?     @map("buyer_id")
+  buyer        Team?       @relation("Buyer", fields: [buyerId], references: [id])
+  itemType     ItemType    @map("item_type")
+  quantity     Int
+  pricePerUnit Int         @map("price_per_unit")
+  status       OrderStatus @default(OPEN)
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  @@map("market_orders")
+}
+
+model GameEventLog {
+  id        String   @id @default(uuid())
+  message   String
+  timestamp DateTime @default(now())
+
+  @@map("game_event_logs")
+}
+
+model GameState {
+  id           String    @id @default("singleton")
+  timerSeconds Int       @default(1200) @map("timer_seconds")
+  timerRunning Boolean   @default(false) @map("timer_running")
+  timerEndsAt  DateTime? @map("timer_ends_at")
+  gameFrozen   Boolean   @default(false) @map("game_frozen")
+
+  @@map("game_state")
+}

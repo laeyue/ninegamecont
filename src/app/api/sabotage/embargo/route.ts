@@ -1,0 +1,92 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { sseBroadcaster, SSE_EVENTS } from "@/lib/sse";
+import { sabotageState } from "@/lib/sabotage-state";
+import { EMBARGO_COST, EMBARGO_DURATION_MS } from "@/lib/game-config";
+import { Tier } from "@prisma/client";
+
+export const dynamic = "force-dynamic";
+
+// POST { attackerId, targetId }
+// Core or Semi-Periphery can embargo any other team for 60s (blocks market access)
+export async function POST(req: NextRequest) {
+  try {
+    const { attackerId, targetId } = await req.json();
+
+    if (!attackerId || !targetId) {
+      return NextResponse.json({ success: false, error: "attackerId and targetId required" }, { status: 400 });
+    }
+    if (attackerId === targetId) {
+      return NextResponse.json({ success: false, error: "Cannot embargo yourself" }, { status: 400 });
+    }
+
+    // Check game frozen
+    const gameState = await prisma.gameState.findUnique({ where: { id: "singleton" } });
+    if (gameState?.gameFrozen) {
+      return NextResponse.json({ success: false, error: "Game is frozen" }, { status: 403 });
+    }
+
+    // Check sabotage cooldown
+    const cd = sabotageState.canSabotage(attackerId);
+    if (!cd.allowed) {
+      return NextResponse.json(
+        { success: false, error: `Sabotage cooldown: ${Math.ceil(cd.remainingMs / 1000)}s remaining` },
+        { status: 429 }
+      );
+    }
+
+    // Check already embargoed
+    if (sabotageState.isEmbargoed(targetId)) {
+      return NextResponse.json({ success: false, error: "Target is already under an embargo" }, { status: 400 });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const attacker = await tx.team.findUnique({ where: { id: attackerId } });
+      if (!attacker) throw new Error("Attacker team not found");
+
+      // Only Core and Semi-Periphery can impose embargoes
+      if (attacker.tier !== Tier.CORE && attacker.tier !== Tier.SEMI_PERIPHERY) {
+        throw new Error("Only Core and Semi-Periphery nations can impose trade embargoes");
+      }
+
+      // Must afford it
+      if (attacker.wealth < EMBARGO_COST) {
+        throw new Error(`Not enough wealth. Need $${EMBARGO_COST}, have $${attacker.wealth}`);
+      }
+
+      const target = await tx.team.findUnique({ where: { id: targetId } });
+      if (!target) throw new Error("Target team not found");
+
+      // Deduct cost
+      const updatedAttacker = await tx.team.update({
+        where: { id: attackerId },
+        data: { wealth: { decrement: EMBARGO_COST } },
+      });
+
+      // Log
+      const log = await tx.gameEventLog.create({
+        data: { message: `${attacker.name} imposed a TRADE EMBARGO on ${target.name} for 60s (-$${EMBARGO_COST})` },
+      });
+
+      return { updatedAttacker, target, log };
+    });
+
+    // Record in-memory state
+    const entry = sabotageState.addEmbargo(targetId, attackerId, result.updatedAttacker.name, EMBARGO_DURATION_MS);
+
+    // Broadcast
+    sseBroadcaster.emit(SSE_EVENTS.TEAM_UPDATE, { team: result.updatedAttacker });
+    sseBroadcaster.emit(SSE_EVENTS.EVENT_LOG, { log: result.log });
+    sseBroadcaster.emit(SSE_EVENTS.EMBARGO_IMPOSED, {
+      targetTeamId: targetId,
+      targetName: result.target.name,
+      imposedByName: result.updatedAttacker.name,
+      until: entry.until,
+    });
+
+    return NextResponse.json({ success: true, data: { message: `Trade embargo imposed on ${result.target.name}` } });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to impose embargo";
+    return NextResponse.json({ success: false, error: message }, { status: 400 });
+  }
+}
