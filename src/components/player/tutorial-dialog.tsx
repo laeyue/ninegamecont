@@ -18,6 +18,8 @@ import {
   Landmark,
   AlertTriangle,
   Rocket,
+  ShieldAlert,
+  FlaskConical,
 } from "lucide-react";
 
 interface TutorialDialogProps {
@@ -316,6 +318,29 @@ const slides = [
             <p className="text-gray-400 text-xs">
               Requires FDI + wealth at $20 or below. Breaks free from the investor but
               halves your wealth and resets tech to 0. A last resort.
+            </p>
+          </div>
+
+          <div className="bg-gray-800/80 border border-gray-700 rounded-lg p-2.5">
+            <div className="flex items-center gap-2 mb-1">
+              <ShieldAlert className="h-3.5 w-3.5 text-amber-400" />
+              <span className="font-semibold text-white text-xs">Trade Tariff</span>
+              <span className="text-gray-500 text-xs ml-auto">Core only</span>
+            </div>
+            <p className="text-gray-400 text-xs">
+              Costs $40. Target receives only 50% of their market sale proceeds for 60 seconds.
+            </p>
+          </div>
+
+          <div className="bg-gray-800/80 border border-gray-700 rounded-lg p-2.5">
+            <div className="flex items-center gap-2 mb-1">
+              <FlaskConical className="h-3.5 w-3.5 text-cyan-400" />
+              <span className="font-semibold text-white text-xs">Resource Synthesis</span>
+              <span className="text-gray-500 text-xs ml-auto">Core only</span>
+            </div>
+            <p className="text-gray-400 text-xs">
+              Costs $40. Creates 1 raw material out of nothing, bypassing the market entirely.
+              10-second cooldown per player.
             </p>
           </div>
         </div>
