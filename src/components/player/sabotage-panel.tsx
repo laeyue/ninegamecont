@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Skull, Ban, Eye, Megaphone, Flame, Loader2 } from "lucide-react";
+import { Skull, Ban, Eye, Megaphone, Flame, Loader2, Scale, FlaskConical } from "lucide-react";
 import type { TeamData, GameStateData } from "@/types";
 import { getTierTheme, cn } from "@/lib/utils";
 import {
@@ -10,6 +10,9 @@ import {
   ESPIONAGE_SUCCESS_CHANCE,
   STRIKE_INVESTOR_PENALTY,
   REVOLUTION_WEALTH_THRESHOLD,
+  TARIFF_COST,
+  SYNTHESIS_COST,
+  SYNTHESIS_COOLDOWN_MS,
 } from "@/lib/game-config";
 import { Tier } from "@prisma/client";
 
@@ -23,6 +26,7 @@ interface SabotagePanelProps {
 interface SabotageStatus {
   embargoes: { targetTeamId: string; imposedByName: string; until: number }[];
   strikes: { teamId: string; teamName: string; until: number }[];
+  tariffs: { targetTeamId: string; imposedByName: string; rate: number; until: number }[];
 }
 
 export function SabotagePanel({ team, allTeams, gameState, memberId }: SabotagePanelProps) {
@@ -32,7 +36,8 @@ export function SabotagePanel({ team, allTeams, gameState, memberId }: SabotageP
   const [loading, setLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [targetId, setTargetId] = useState("");
-  const [status, setStatus] = useState<SabotageStatus>({ embargoes: [], strikes: [] });
+  const [status, setStatus] = useState<SabotageStatus>({ embargoes: [], strikes: [], tariffs: [] });
+  const [synthCooldown, setSynthCooldown] = useState(0);
 
   // Poll sabotage status
   const fetchStatus = useCallback(async () => {
@@ -49,6 +54,15 @@ export function SabotagePanel({ team, allTeams, gameState, memberId }: SabotageP
     return () => clearInterval(interval);
   }, [fetchStatus]);
 
+  // Synthesis cooldown timer (client-side display)
+  useEffect(() => {
+    if (synthCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setSynthCooldown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [synthCooldown]);
+
   const showMessage = (text: string, type: "success" | "error") => {
     setMessage({ text, type });
     setTimeout(() => setMessage(null), 4000);
@@ -63,15 +77,20 @@ export function SabotagePanel({ team, allTeams, gameState, memberId }: SabotageP
   const canEspionage = isPeriphery || isSemiP;
   const canStrike = isPeriphery && !!team.fdiInvestorId;
   const canRevolution = isPeriphery && !!team.fdiInvestorId && team.wealth <= REVOLUTION_WEALTH_THRESHOLD;
+  const canTariff = isCore;
+  const canSynthesize = isCore;
 
   // Targets for embargo: all teams except self
   const embargoTargets = allTeams.filter((t) => t.id !== team.id);
   // Targets for espionage: teams with higher tech
   const espionageTargets = allTeams.filter((t) => t.id !== team.id && t.techLevel > team.techLevel);
+  // Targets for tariff: all teams except self (typically used on Periphery/Semi-P)
+  const tariffTargets = allTeams.filter((t) => t.id !== team.id);
 
-  // Check if our team is embargoed or on strike
+  // Check if our team is embargoed, on strike, or tariffed
   const ourEmbargo = status.embargoes.find((e) => e.targetTeamId === team.id);
   const ourStrike = status.strikes.find((s) => s.teamId === team.id);
+  const ourTariff = status.tariffs.find((t) => t.targetTeamId === team.id);
 
   // --- Handlers ---
 
@@ -169,6 +188,53 @@ export function SabotagePanel({ team, allTeams, gameState, memberId }: SabotageP
     }
   };
 
+  const handleTariff = async () => {
+    if (!targetId || loading) return;
+    setLoading("tariff");
+    try {
+      const res = await fetch("/api/sabotage/tariff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ attackerId: team.id, targetId, memberId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showMessage(data.data.message, "success");
+        setTargetId("");
+        fetchStatus();
+      } else {
+        showMessage(data.error, "error");
+      }
+    } catch {
+      showMessage("Network error", "error");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleSynthesis = async () => {
+    if (loading || synthCooldown > 0) return;
+    setLoading("synthesis");
+    try {
+      const res = await fetch("/api/sabotage/synthesis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamId: team.id, memberId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showMessage(data.data.message, "success");
+        setSynthCooldown(Math.ceil(SYNTHESIS_COOLDOWN_MS / 1000));
+      } else {
+        showMessage(data.error, "error");
+      }
+    } catch {
+      showMessage("Network error", "error");
+    } finally {
+      setLoading(null);
+    }
+  };
+
   return (
     <div className={`${theme.bgCard} border border-red-700/30 rounded-xl p-4`}>
       <div className="flex items-center gap-2 mb-3">
@@ -179,7 +245,7 @@ export function SabotagePanel({ team, allTeams, gameState, memberId }: SabotageP
       </div>
 
       {/* Active effects on our team */}
-      {(ourEmbargo || ourStrike) && (
+      {(ourEmbargo || ourStrike || ourTariff) && (
         <div className="mb-3 space-y-1">
           {ourEmbargo && (
             <ActiveEffect
@@ -195,10 +261,55 @@ export function SabotagePanel({ team, allTeams, gameState, memberId }: SabotageP
               color="text-yellow-400 bg-yellow-900/20"
             />
           )}
+          {ourTariff && (
+            <ActiveEffect
+              label={`Tariffed by ${ourTariff.imposedByName} (50% sale tax)`}
+              until={ourTariff.until}
+              color="text-cyan-400 bg-cyan-900/20"
+            />
+          )}
         </div>
       )}
 
       <div className="space-y-3">
+        {/* --- TARIFF (Core only) --- */}
+        {canTariff && (
+          <SabotageAction
+            icon={<Scale className="h-4 w-4" />}
+            title="Trade Tariff"
+            description={`Target receives only 50% of sale proceeds for 60s. Costs $${TARIFF_COST}`}
+            color="bg-cyan-950/30 border-cyan-900/30 text-cyan-300 hover:bg-cyan-950/50"
+            disabled={isFrozen || !!loading || team.wealth < TARIFF_COST}
+            loading={loading === "tariff"}
+            onAction={handleTariff}
+            targetSelector={
+              <select
+                value={targetId}
+                onChange={(e) => setTargetId(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white mt-2"
+              >
+                <option value="">Select target...</option>
+                {tariffTargets.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name} ({t.tier})</option>
+                ))}
+              </select>
+            }
+          />
+        )}
+
+        {/* --- SYNTHESIS (Core only) --- */}
+        {canSynthesize && (
+          <SabotageAction
+            icon={<FlaskConical className="h-4 w-4" />}
+            title="Resource Synthesis"
+            description={`Synthesize 1 raw material for $${SYNTHESIS_COST}. ${synthCooldown > 0 ? `Cooldown: ${synthCooldown}s` : "10s cooldown"}`}
+            color="bg-emerald-950/30 border-emerald-900/30 text-emerald-300 hover:bg-emerald-950/50"
+            disabled={isFrozen || !!loading || team.wealth < SYNTHESIS_COST || synthCooldown > 0}
+            loading={loading === "synthesis"}
+            onAction={handleSynthesis}
+          />
+        )}
+
         {/* --- EMBARGO (Core / Semi-P) --- */}
         {canEmbargo && (
           <SabotageAction

@@ -61,7 +61,14 @@ export async function POST(
         throw new Error(`Not enough wealth. Need $${totalCost}, have $${buyer.wealth}`);
       }
 
-      // Deduct wealth from buyer
+      // Check if seller has an active tariff — if so, seller only receives a fraction
+      const tariff = sabotageState.getTariff(order.sellerId);
+      const sellerReceives = tariff
+        ? Math.floor(totalCost * (1 - tariff.rate))
+        : totalCost;
+      const tariffTaken = totalCost - sellerReceives;
+
+      // Deduct wealth from buyer (buyer always pays full price)
       const updatedBuyer = await tx.team.update({
         where: { id: buyerId },
         data: {
@@ -72,10 +79,10 @@ export async function POST(
         },
       });
 
-      // Credit wealth to seller
+      // Credit wealth to seller (reduced if tariff is active)
       const updatedSeller = await tx.team.update({
         where: { id: order.sellerId },
-        data: { wealth: { increment: totalCost } },
+        data: { wealth: { increment: sellerReceives } },
       });
 
       // Mark order completed
@@ -88,14 +95,17 @@ export async function POST(
         },
       });
 
-      // Log the trade
+      // Log the trade (include tariff info if applicable)
+      const tariffNote = tariffTaken > 0
+        ? ` (TARIFF: seller received $${sellerReceives}, $${tariffTaken} lost to tariff)`
+        : "";
       const log = await tx.gameEventLog.create({
         data: {
-          message: `${buyer.name} bought ${order.quantity} ${order.itemType === "RAW_MATERIAL" ? "Raw Materials" : "Technology"} from ${order.seller.name} for $${totalCost}`,
+          message: `${buyer.name} bought ${order.quantity} ${order.itemType === "RAW_MATERIAL" ? "Raw Materials" : "Technology"} from ${order.seller.name} for $${totalCost}${tariffNote}`,
         },
       });
 
-      return { completedOrder, updatedBuyer, updatedSeller, log };
+      return { completedOrder, updatedBuyer, updatedSeller, log, tariffTaken };
     });
 
     const orderData = {

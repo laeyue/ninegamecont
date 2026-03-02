@@ -43,6 +43,13 @@ export const STRIKE_DURATION_MS = 30_000; // 30 seconds
 export const STRIKE_INVESTOR_PENALTY = 30; // Core investor loses $30
 export const REVOLUTION_WEALTH_THRESHOLD = 20; // wealth must be <= this
 
+// ---------- Core-exclusive sabotage ----------
+export const TARIFF_COST = 40;
+export const TARIFF_DURATION_MS = 60_000; // 60 seconds
+export const TARIFF_RATE = 0.5; // 50% of sale price taken from seller
+export const SYNTHESIS_COST = 40;
+export const SYNTHESIS_COOLDOWN_MS = 10_000; // 10 seconds per player
+
 // ---------- Tier display info ----------
 export const TIER_LABELS: Record<Tier, string> = {
   [Tier.CORE]: "Core",

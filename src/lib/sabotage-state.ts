@@ -14,12 +14,22 @@ export interface StrikeEntry {
   until: number; // Date.now() + duration
 }
 
+export interface TariffEntry {
+  targetTeamId: string;
+  imposedByTeamId: string;
+  imposedByName: string;
+  rate: number; // fraction of sale price taken (e.g. 0.5 = 50%)
+  until: number; // Date.now() + duration
+}
+
 // Sabotage cooldown per team (prevent spam)
 const SABOTAGE_COOLDOWN_MS = 15_000; // 15s between any sabotage action per team
 
 class SabotageState {
   private embargoes = new Map<string, EmbargoEntry>(); // targetTeamId -> entry
   private strikes = new Map<string, StrikeEntry>();    // teamId -> entry
+  private tariffs = new Map<string, TariffEntry>();    // targetTeamId -> entry
+  private synthesisCooldowns = new Map<string, number>(); // memberId -> timestamp
   private lastSabotageTime = new Map<string, number>(); // attackerTeamId -> timestamp
 
   // --- Embargo ---
@@ -78,6 +88,57 @@ class SabotageState {
     this.lastSabotageTime.set(teamId, Date.now());
   }
 
+  // --- Tariff ---
+
+  addTariff(targetTeamId: string, imposedByTeamId: string, imposedByName: string, rate: number, durationMs: number): TariffEntry {
+    const entry: TariffEntry = {
+      targetTeamId,
+      imposedByTeamId,
+      imposedByName,
+      rate,
+      until: Date.now() + durationMs,
+    };
+    this.tariffs.set(targetTeamId, entry);
+    this.lastSabotageTime.set(imposedByTeamId, Date.now());
+    return entry;
+  }
+
+  getTariff(teamId: string): TariffEntry | null {
+    const entry = this.tariffs.get(teamId);
+    if (!entry) return null;
+    if (Date.now() > entry.until) {
+      this.tariffs.delete(teamId);
+      return null;
+    }
+    return entry;
+  }
+
+  getActiveTariffs(): TariffEntry[] {
+    const now = Date.now();
+    const active: TariffEntry[] = [];
+    for (const [teamId, entry] of this.tariffs) {
+      if (now > entry.until) {
+        this.tariffs.delete(teamId);
+      } else {
+        active.push(entry);
+      }
+    }
+    return active;
+  }
+
+  // --- Synthesis cooldown (per-player) ---
+
+  canSynthesize(memberId: string, cooldownMs: number): { allowed: boolean; remainingMs: number } {
+    const last = this.synthesisCooldowns.get(memberId) ?? 0;
+    const elapsed = Date.now() - last;
+    if (elapsed >= cooldownMs) return { allowed: true, remainingMs: 0 };
+    return { allowed: false, remainingMs: cooldownMs - elapsed };
+  }
+
+  recordSynthesis(memberId: string): void {
+    this.synthesisCooldowns.set(memberId, Date.now());
+  }
+
   // --- Status (for /api/sabotage/status) ---
 
   getActiveEmbargoes(): EmbargoEntry[] {
@@ -111,6 +172,8 @@ class SabotageState {
   clear(): void {
     this.embargoes.clear();
     this.strikes.clear();
+    this.tariffs.clear();
+    this.synthesisCooldowns.clear();
     this.lastSabotageTime.clear();
   }
 }

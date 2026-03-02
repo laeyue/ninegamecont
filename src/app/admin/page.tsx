@@ -44,6 +44,14 @@ export default function AdminPage() {
       const d = data as { teamName: string; investorName: string };
       pushNews(`REVOLUTION! ${d.teamName} overthrew ${d.investorName}'s foreign control!`, "crisis");
     },
+    "tariff-imposed": (data: unknown) => {
+      const d = data as { targetName: string; imposedByName: string };
+      pushNews(`${d.imposedByName} imposed a TRADE TARIFF on ${d.targetName} — 50% sale tax for 60s!`, "sabotage");
+    },
+    "resource-synthesized": (data: unknown) => {
+      const d = data as { teamName: string; cost: number };
+      pushNews(`${d.teamName} synthesized raw materials, bypassing the market!`, "diplomacy");
+    },
     "event-log": (data: unknown) => {
       const d = data as { log: { message: string } };
       const msg = d.log.message;

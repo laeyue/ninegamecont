@@ -54,4 +54,6 @@ export const SSE_EVENTS = {
   ESPIONAGE_RESULT: "espionage-result",
   STRIKE_STARTED: "strike-started",
   REVOLUTION: "revolution",
+  TARIFF_IMPOSED: "tariff-imposed",
+  RESOURCE_SYNTHESIZED: "resource-synthesized",
 } as const;

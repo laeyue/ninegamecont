@@ -41,6 +41,8 @@ export function useSSE(handlers: Record<string, SSEHandler>) {
       "espionage-result",
       "strike-started",
       "revolution",
+      "tariff-imposed",
+      "resource-synthesized",
     ];
 
     for (const eventType of eventTypes) {
