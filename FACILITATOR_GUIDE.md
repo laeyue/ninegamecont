@@ -37,7 +37,7 @@ This is a real-time multiplayer web app that simulates **global economic inequal
 | **Mine** (extract raw materials) | No | Yes (5s cooldown) | Yes (3s cooldown) |
 | **Manufacture** (convert 1 raw material → money) | Yes (+$50/unit) | Yes (+$30/unit) | Only if tech >= 1 (+$30/unit) |
 | **Trade on Market** | Yes | Yes | Yes |
-| **Sabotage** | Embargo, Espionage restrictions apply | Embargo, Espionage | Strike, Revolution, Espionage |
+| **Sabotage** | Embargo, Espionage, **Tariff**, **Synthesis** | Embargo, Espionage | Strike, Revolution, Espionage |
 
 **Key insight for students:** Core nations start rich with high technology but have **zero raw materials**. They need to buy from Periphery/Semi-Periphery on the market. Periphery nations have lots of raw materials but almost no money and no technology.
 
@@ -54,7 +54,7 @@ When students open the game on their phone, they:
 |---|---|---|
 | 1st member | **Miner** (or Manufacturer for Core) | Mine raw materials + Sell on Market |
 | 2nd member | **Manufacturer** (or Saboteur for Core) | Manufacture goods + Buy from Market |
-| 3rd member | **Saboteur** | Perform sabotage actions (embargo, espionage, strike, revolution) |
+| 3rd member | **Saboteur** | Perform sabotage actions (embargo, espionage, strike, revolution, tariff, synthesis) |
 | 4th member | **Treasurer** | View-only dashboard — tracks team stats |
 
 - **Core teams skip Miner** (they can't mine), so roles are: Manufacturer → Saboteur → Treasurer → Treasurer.
@@ -124,7 +124,7 @@ Use this to cut off a rival's trade routes. Especially devastating against Perip
 |---|---|
 | **Who can use** | Periphery and Semi-Periphery |
 | **Cost** | Free if successful. **$40 fine** if you fail (paid to the target) |
-| **Success rate** | **40% chance** of success |
+| **Success rate** | **25% chance** of success |
 | **Effect on success** | Your team gains **+1 tech level** |
 | **Effect on failure** | Your team loses **$40**, target team gains **$40** |
 | **Target** | Any team with a **higher tech level** than yours |
@@ -153,6 +153,33 @@ A strike hurts your own productivity but punishes the exploitative Core investor
 | **Requirement** | Wealth must be $20 or less, and must have an active FDI link |
 
 Revolution is the nuclear option. It frees you from FDI extraction but at a devastating cost. Your team starts over with almost nothing — but at least you keep what you earn.
+
+### 5. Trade Tariff (Core Exclusive)
+
+| Detail | Value |
+|---|---|
+| **Who can use** | Core only |
+| **Cost** | $40 (deducted from your team) |
+| **Effect** | Target team receives **only 50% of market sale proceeds** for 60 seconds |
+| **Target** | Any other team |
+| **Cooldown** | 15 seconds (shared with all sabotage actions) |
+
+When a tariff is active, the target's market listings still sell at full price to the buyer, but the seller only receives half the money — the rest is destroyed (simulating tariff losses). This is devastating to Periphery teams whose only income is selling raw materials.
+
+**Strategic note:** Tariffs create a natural incentive for Core nations to control terms of trade. Pair with a low buy price and the target team barely earns anything.
+
+### 6. Resource Synthesis (Core Exclusive)
+
+| Detail | Value |
+|---|---|
+| **Who can use** | Core only |
+| **Cost** | $40 per raw material |
+| **Effect** | Generates **1 raw material** directly, bypassing the market |
+| **Cooldown** | 10 seconds per player (separate from the 15s team sabotage cooldown) |
+
+Core nations can spend money to create raw materials from nothing. This creates a **natural price ceiling of $40 per raw material** — if the market price is higher, Core teams just synthesize instead of buying. This further undermines Periphery bargaining power.
+
+**Discussion prompt:** "In the real world, what happens when wealthy nations develop synthetic alternatives to resources that poor nations depend on for export?"
 
 ---
 
@@ -291,6 +318,8 @@ The admin dashboard at `/admin` gives the teacher full control.
 | Tech level determines who can manufacture | Industrialization gap | Modernization Theory |
 | Debt crisis halves Periphery wealth | 1980s Third World debt crisis | Dependency Theory |
 | Embargo blocks trade | Economic sanctions, trade wars | World Systems Theory |
+| Tariff reduces seller income | Protective tariffs, trade barriers | World Systems Theory |
+| Resource Synthesis bypasses market | Synthetic alternatives, import substitution | Dependency Theory |
 | Revolution breaks FDI but costs everything | Nationalization, decolonization movements | Dependency Theory |
 | Espionage steals technology | Industrial espionage, technology transfer | Modernization Theory |
 | Market prices favor Core buyers | Unequal terms of trade | World Systems Theory |
@@ -337,7 +366,9 @@ FDI WARNING: If your team accepts FDI, you get +1 tech
 
 SABOTAGE OPTIONS:
   Embargo    → Block target's market access for 60s (costs $50)
-  Espionage  → 40% chance to steal +1 tech (fail = $40 fine)
+  Espionage  → 25% chance to steal +1 tech (fail = $40 fine)
   Strike     → Halt own production 30s, Core investor loses $30
   Revolution → Break FDI link (requires wealth <= $20, resets tech)
+  Tariff     → Target gets only 50% of sale proceeds for 60s ($40)
+  Synthesis  → Create 1 raw material for $40 (Core only, 10s cooldown)
 ```
