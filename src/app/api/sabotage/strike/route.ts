@@ -44,6 +44,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Already on strike" }, { status: 400 });
     }
 
+    // Record cooldown BEFORE the async DB transaction to prevent TOCTOU race
+    sabotageState.recordSabotage(teamId);
+
     const result = await prisma.$transaction(async (tx) => {
       const team = await tx.team.findUnique({ where: { id: teamId } });
       if (!team) throw new Error("Team not found");

@@ -45,6 +45,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Target is already under an embargo" }, { status: 400 });
     }
 
+    // Record cooldown BEFORE the async DB transaction to prevent TOCTOU race
+    sabotageState.recordSabotage(attackerId);
+
     const result = await prisma.$transaction(async (tx) => {
       const attacker = await tx.team.findUnique({ where: { id: attackerId } });
       if (!attacker) throw new Error("Attacker team not found");

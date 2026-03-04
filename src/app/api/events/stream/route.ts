@@ -19,6 +19,8 @@ export async function GET() {
         try {
           controller.enqueue(encoder.encode(`: heartbeat\n\n`));
         } catch {
+          // Client disconnected — clean up both heartbeat and listener
+          unsubscribe?.();
           clearInterval(heartbeat);
         }
       }, 30000);

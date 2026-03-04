@@ -40,6 +40,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Record cooldown BEFORE the async DB transaction to prevent TOCTOU race
+    sabotageState.recordSabotage(teamId);
+
     const result = await prisma.$transaction(async (tx) => {
       const team = await tx.team.findUnique({ where: { id: teamId } });
       if (!team) throw new Error("Team not found");
@@ -78,9 +81,6 @@ export async function POST(req: NextRequest) {
 
       return { updated, investorName, halfWealth, log };
     });
-
-    // Record cooldown
-    sabotageState.recordSabotage(teamId);
 
     // Broadcast
     sseBroadcaster.emit(SSE_EVENTS.TEAM_UPDATE, { team: result.updated });

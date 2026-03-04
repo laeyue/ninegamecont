@@ -41,6 +41,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Record cooldown BEFORE the async DB transaction to prevent TOCTOU race
+    sabotageState.recordSabotage(attackerId);
+
     const succeeded = Math.random() < ESPIONAGE_SUCCESS_CHANCE;
 
     const result = await prisma.$transaction(async (tx) => {
@@ -94,9 +97,6 @@ export async function POST(req: NextRequest) {
         return { updatedAttacker, updatedTarget, log, succeeded: false };
       }
     });
-
-    // Record cooldown
-    sabotageState.recordSabotage(attackerId);
 
     // Broadcast
     sseBroadcaster.emit(SSE_EVENTS.TEAM_UPDATE, { team: result.updatedAttacker });

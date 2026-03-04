@@ -40,6 +40,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Record synthesis cooldown BEFORE the async DB transaction to prevent TOCTOU race
+    if (memberId) {
+      sabotageState.recordSynthesis(memberId);
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       const team = await tx.team.findUnique({ where: { id: teamId } });
       if (!team) throw new Error("Team not found");
@@ -70,11 +75,6 @@ export async function POST(req: NextRequest) {
 
       return { updatedTeam, log };
     });
-
-    // Record cooldown
-    if (memberId) {
-      sabotageState.recordSynthesis(memberId);
-    }
 
     // Broadcast
     sseBroadcaster.emit(SSE_EVENTS.TEAM_UPDATE, { team: result.updatedTeam });
