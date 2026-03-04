@@ -58,19 +58,26 @@ export async function POST(req: NextRequest) {
         throw new Error("Only Core nations can impose trade tariffs");
       }
 
-      // Must afford it
-      if (attacker.wealth < TARIFF_COST) {
-        throw new Error(`Not enough wealth. Need $${TARIFF_COST}, have $${attacker.wealth}`);
-      }
-
       const target = await tx.team.findUnique({ where: { id: targetId } });
       if (!target) throw new Error("Target team not found");
 
-      // Deduct cost
-      const updatedAttacker = await tx.team.update({
-        where: { id: attackerId },
-        data: { wealth: { decrement: TARIFF_COST } },
-      });
+      // Atomic conditional deduction — only deducts if wealth >= cost
+      // Prevents TOCTOU race where concurrent requests both pass a check and both deduct.
+      const deductResult: { id: string }[] = await tx.$queryRawUnsafe(
+        `UPDATE "teams"
+         SET "wealth" = "wealth" - $1
+         WHERE "id" = $2 AND "wealth" >= $1
+         RETURNING "id"`,
+        TARIFF_COST,
+        attackerId
+      );
+      if (deductResult.length === 0) {
+        throw new Error(`Not enough wealth. Need $${TARIFF_COST}, have $${attacker.wealth}`);
+      }
+
+      // Re-fetch attacker for broadcasting
+      const updatedAttacker = await tx.team.findUnique({ where: { id: attackerId } });
+      if (!updatedAttacker) throw new Error("Attacker not found after update");
 
       // Log
       const log = await tx.gameEventLog.create({

@@ -54,19 +54,25 @@ export async function POST(req: NextRequest) {
         throw new Error("Only Core nations can synthesize resources");
       }
 
-      // Must afford it
-      if (team.wealth < SYNTHESIS_COST) {
+      // Atomic conditional deduction — only deducts if wealth >= cost
+      // Also increments rawMaterials in the same atomic operation.
+      // Prevents TOCTOU race where concurrent requests both pass a check and both deduct.
+      const deductResult: { id: string }[] = await tx.$queryRawUnsafe(
+        `UPDATE "teams"
+         SET "wealth" = "wealth" - $1,
+             "raw_materials" = "raw_materials" + 1
+         WHERE "id" = $2 AND "wealth" >= $1
+         RETURNING "id"`,
+        SYNTHESIS_COST,
+        teamId
+      );
+      if (deductResult.length === 0) {
         throw new Error(`Not enough wealth. Need $${SYNTHESIS_COST}, have $${team.wealth}`);
       }
 
-      // Deduct cost, add 1 raw material
-      const updatedTeam = await tx.team.update({
-        where: { id: teamId },
-        data: {
-          wealth: { decrement: SYNTHESIS_COST },
-          rawMaterials: { increment: 1 },
-        },
-      });
+      // Re-fetch team for broadcasting
+      const updatedTeam = await tx.team.findUnique({ where: { id: teamId } });
+      if (!updatedTeam) throw new Error("Team not found after update");
 
       // Log
       const log = await tx.gameEventLog.create({

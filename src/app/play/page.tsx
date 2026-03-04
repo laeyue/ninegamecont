@@ -20,7 +20,7 @@ import type { Member } from "@/hooks/use-member";
 
 export default function PlayPage() {
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-  const [tutorialDone, setTutorialDone] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const [newsItem, setNewsItem] = useState<NewsItem | null>(null);
   const newsIdCounter = useRef(0);
 
@@ -33,11 +33,15 @@ export default function PlayPage() {
   useEffect(() => {
     const stored = localStorage.getItem("selectedTeamId");
     if (stored) setSelectedTeamId(stored);
-    if (localStorage.getItem("tutorialDone")) setTutorialDone(true);
+
+    // Show tutorial on very first visit (no tutorialDone key yet)
+    if (!localStorage.getItem("tutorialDone")) {
+      setShowTutorial(true);
+    }
   }, []);
 
   const handleTutorialComplete = () => {
-    setTutorialDone(true);
+    setShowTutorial(false);
     localStorage.setItem("tutorialDone", "1");
   };
 
@@ -53,10 +57,24 @@ export default function PlayPage() {
   };
 
   const { team, allTeams, orders, gameState, loading } = useTeam(selectedTeamId);
-  const { member, loading: memberLoading, error: memberError, join, leave, applyRoleRotation } = useMember(selectedTeamId);
+  const { member, loading: memberLoading, error: memberError, join, leave, resetMember, applyRoleRotation } = useMember(selectedTeamId);
 
-  // Listen for SSE events — role rotations + news flash triggers
+  // Listen for SSE events — role rotations + news flash triggers + game reset
   useSSE({
+    "game-reset": () => {
+      // Clear all member data so players must re-enter their name
+      // Remove member entries for all teams (player may have switched teams before)
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("member:")) {
+          localStorage.removeItem(key);
+        }
+      }
+      localStorage.removeItem("selectedTeamId");
+      resetMember();
+      setSelectedTeamId(null);
+      pushNews("GAME RESET — All players must rejoin!", "system");
+    },
     "roles-rotated": (data: unknown) => {
       const { teamId, members } = data as { teamId: string; members: Member[] };
       if (teamId === selectedTeamId) {
@@ -123,8 +141,8 @@ export default function PlayPage() {
     );
   }
 
-  // Step 0: show tutorial if not done yet and no team selected
-  if (!tutorialDone && !selectedTeamId) {
+  // Step 0: show tutorial on first visit
+  if (showTutorial && !selectedTeamId) {
     return <TutorialDialog onComplete={handleTutorialComplete} />;
   }
 

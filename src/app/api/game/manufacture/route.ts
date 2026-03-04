@@ -74,11 +74,6 @@ export async function POST(request: NextRequest) {
         throw new Error("Cannot manufacture: insufficient tech level");
       }
 
-      // Validate resources
-      if (team.rawMaterials < 1) {
-        throw new Error("Not enough raw materials");
-      }
-
       // Calculate output
       const baseOutput = getManufactureOutput(team.tier);
       let teamProfit = baseOutput;
@@ -97,14 +92,26 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Update manufacturing team
-      const updated = await tx.team.update({
-        where: { id: teamId },
-        data: {
-          rawMaterials: { decrement: 1 },
-          wealth: { increment: teamProfit },
-        },
-      });
+      // Atomic conditional update — only decrements if raw_materials >= 1
+      // This prevents the TOCTOU race where two concurrent transactions both
+      // read rawMaterials=1, both pass a check, and both decrement to -1.
+      const updateResult: { id: string }[] = await tx.$queryRawUnsafe(
+        `UPDATE "teams"
+         SET "raw_materials" = "raw_materials" - 1,
+             "wealth" = "wealth" + $1
+         WHERE "id" = $2 AND "raw_materials" >= 1
+         RETURNING "id"`,
+        teamProfit,
+        teamId
+      );
+
+      if (updateResult.length === 0) {
+        throw new Error("Not enough raw materials");
+      }
+
+      // Re-fetch the updated team to get current state for broadcasting
+      const updated = await tx.team.findUnique({ where: { id: teamId } });
+      if (!updated) throw new Error("Team not found after update");
 
       // Log the event
       let logMessage = `${team.name} manufactured: +$${teamProfit}`;

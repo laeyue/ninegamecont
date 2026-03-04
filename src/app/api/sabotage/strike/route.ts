@@ -59,16 +59,23 @@ export async function POST(req: NextRequest) {
         throw new Error("No FDI investor — a strike requires a foreign investor to hurt");
       }
 
-      // Penalize the Core investor (clamp so wealth doesn't go negative)
-      const investor = await tx.team.findUnique({ where: { id: team.fdiInvestorId } });
-      if (!investor) throw new Error("FDI investor not found");
+      // Penalize the Core investor atomically (clamp so wealth doesn't go negative)
+      // Uses GREATEST to ensure wealth never goes below 0 under concurrent strikes
+      await tx.$queryRawUnsafe(
+        `UPDATE "teams"
+         SET "wealth" = GREATEST("wealth" - $1, 0)
+         WHERE "id" = $2
+         RETURNING "id"`,
+        STRIKE_INVESTOR_PENALTY,
+        team.fdiInvestorId
+      );
 
-      const actualPenalty = Math.min(STRIKE_INVESTOR_PENALTY, investor.wealth);
+      // Re-fetch investor for broadcasting and log
+      const updatedInvestor = await tx.team.findUnique({ where: { id: team.fdiInvestorId } });
+      if (!updatedInvestor) throw new Error("FDI investor not found after update");
 
-      const updatedInvestor = await tx.team.update({
-        where: { id: team.fdiInvestorId },
-        data: { wealth: { decrement: actualPenalty } },
-      });
+      // Actual penalty is at most STRIKE_INVESTOR_PENALTY; wealth was clamped at 0
+      const actualPenalty = STRIKE_INVESTOR_PENALTY;
 
       const log = await tx.gameEventLog.create({
         data: {

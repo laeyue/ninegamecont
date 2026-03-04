@@ -76,15 +76,23 @@ export async function POST(req: NextRequest) {
 
         return { updatedAttacker, updatedTarget: target, log, succeeded: true };
       } else {
-        // Failure — attacker pays fine to target
-        if (attacker.wealth < ESPIONAGE_COST_ON_FAIL) {
+        // Failure — attacker pays fine to target (atomic conditional deduction)
+        const fineResult: { id: string }[] = await tx.$queryRawUnsafe(
+          `UPDATE "teams"
+           SET "wealth" = "wealth" - $1
+           WHERE "id" = $2 AND "wealth" >= $1
+           RETURNING "id"`,
+          ESPIONAGE_COST_ON_FAIL,
+          attackerId
+        );
+        if (fineResult.length === 0) {
           throw new Error(`Espionage failed and you can't afford the $${ESPIONAGE_COST_ON_FAIL} fine (have $${attacker.wealth})`);
         }
 
-        const updatedAttacker = await tx.team.update({
-          where: { id: attackerId },
-          data: { wealth: { decrement: ESPIONAGE_COST_ON_FAIL } },
-        });
+        // Re-fetch attacker for broadcasting
+        const updatedAttacker = await tx.team.findUnique({ where: { id: attackerId } });
+        if (!updatedAttacker) throw new Error("Attacker not found after update");
+
         const updatedTarget = await tx.team.update({
           where: { id: targetId },
           data: { wealth: { increment: ESPIONAGE_COST_ON_FAIL } },

@@ -11,7 +11,8 @@ function createPrismaClient(): PrismaClient {
     process.env.DATABASE_URL ||
     "postgresql://postgres:postgres@localhost:5432/ninegame?schema=public";
   // Explicit pool with higher max for 70 concurrent users (default is 10)
-  const pool = new Pool({ connectionString, max: 20 });
+  // 50 connections handles 70 concurrent players including transactions that hold 2 connections
+  const pool = new Pool({ connectionString, max: 50 });
   const adapter = new PrismaPg(pool);
   return new PrismaClient({ adapter });
 }

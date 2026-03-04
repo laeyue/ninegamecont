@@ -131,7 +131,12 @@ export function useMember(teamId: string | null) {
     }).catch(() => {});
   }, [member, teamId]);
 
-  return { member, loading, error, join, leave, applyRoleRotation };
+  // Reset member state without server call (used on game-reset SSE)
+  const resetMember = useCallback(() => {
+    setMember(null);
+  }, []);
+
+  return { member, loading, error, join, leave, resetMember, applyRoleRotation };
 }
 
 export type { MemberRole, Member };

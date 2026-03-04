@@ -54,12 +54,9 @@ export async function POST(
 
       const totalCost = order.quantity * order.pricePerUnit;
 
-      // Verify buyer has enough wealth
+      // Fetch buyer for name (used in log message)
       const buyer = await tx.team.findUnique({ where: { id: buyerId } });
       if (!buyer) throw new Error("Buyer not found");
-      if (buyer.wealth < totalCost) {
-        throw new Error(`Not enough wealth. Need $${totalCost}, have $${buyer.wealth}`);
-      }
 
       // Check if seller has an active tariff — if so, seller only receives a fraction
       const tariff = sabotageState.getTariff(order.sellerId);
@@ -68,16 +65,33 @@ export async function POST(
         : totalCost;
       const tariffTaken = totalCost - sellerReceives;
 
-      // Deduct wealth from buyer (buyer always pays full price)
-      const updatedBuyer = await tx.team.update({
-        where: { id: buyerId },
-        data: {
-          wealth: { decrement: totalCost },
-          ...(order.itemType === "RAW_MATERIAL"
-            ? { rawMaterials: { increment: order.quantity } }
-            : {}),
-        },
-      });
+      // Atomic conditional update — only deducts if wealth >= totalCost
+      // This prevents the TOCTOU race where two concurrent buys by the same
+      // team both read sufficient wealth and both decrement, overdrawing to negative.
+      const isRawMaterial = order.itemType === "RAW_MATERIAL";
+      const buyerUpdateResult: { id: string }[] = await tx.$queryRawUnsafe(
+        isRawMaterial
+          ? `UPDATE "teams"
+             SET "wealth" = "wealth" - $1,
+                 "raw_materials" = "raw_materials" + $2
+             WHERE "id" = $3 AND "wealth" >= $1
+             RETURNING "id"`
+          : `UPDATE "teams"
+             SET "wealth" = "wealth" - $1
+             WHERE "id" = $2 AND "wealth" >= $1
+             RETURNING "id"`,
+        ...(isRawMaterial
+          ? [totalCost, order.quantity, buyerId]
+          : [totalCost, buyerId])
+      );
+
+      if (buyerUpdateResult.length === 0) {
+        throw new Error(`Not enough wealth. Need $${totalCost}, have $${buyer.wealth}`);
+      }
+
+      // Re-fetch buyer to get updated state for broadcasting
+      const updatedBuyer = await tx.team.findUnique({ where: { id: buyerId } });
+      if (!updatedBuyer) throw new Error("Buyer not found after update");
 
       // Credit wealth to seller (reduced if tariff is active)
       const updatedSeller = await tx.team.update({
@@ -85,15 +99,26 @@ export async function POST(
         data: { wealth: { increment: sellerReceives } },
       });
 
-      // Mark order completed
-      const completedOrder = await tx.marketOrder.update({
-        where: { id: orderId },
+      // Atomically mark order as COMPLETED only if still OPEN
+      // This prevents double-buy: if two buyers race, one gets count=0
+      // and the transaction rolls back (including the wealth deduction above).
+      const orderUpdate = await tx.marketOrder.updateMany({
+        where: { id: orderId, status: "OPEN" },
         data: { status: "COMPLETED", buyerId },
+      });
+      if (orderUpdate.count === 0) {
+        throw new Error("Order is no longer available");
+      }
+
+      // Re-fetch the completed order with includes for broadcasting
+      const completedOrder = await tx.marketOrder.findUnique({
+        where: { id: orderId },
         include: {
           seller: { select: { name: true } },
           buyer: { select: { name: true } },
         },
       });
+      if (!completedOrder) throw new Error("Order not found after update");
 
       // Log the trade (include tariff info if applicable)
       const tariffNote = tariffTaken > 0

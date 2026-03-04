@@ -82,16 +82,21 @@ export async function POST(request: NextRequest) {
         throw new Error(`Trade embargo by ${embargo.imposedByName} (${remaining}s remaining)`);
       }
 
-      if (itemType === "RAW_MATERIAL" && seller.rawMaterials < quantity) {
-        throw new Error("Not enough raw materials");
-      }
-
-      // Deduct materials (escrow)
+      // Atomic conditional escrow — only deducts if raw_materials >= quantity
+      // This prevents the TOCTOU race where two concurrent sell listings both
+      // read sufficient materials and both decrement, going negative.
       if (itemType === "RAW_MATERIAL") {
-        await tx.team.update({
-          where: { id: sellerId },
-          data: { rawMaterials: { decrement: quantity } },
-        });
+        const escrowResult: { id: string }[] = await tx.$queryRawUnsafe(
+          `UPDATE "teams"
+           SET "raw_materials" = "raw_materials" - $1
+           WHERE "id" = $2 AND "raw_materials" >= $1
+           RETURNING "id"`,
+          quantity,
+          sellerId
+        );
+        if (escrowResult.length === 0) {
+          throw new Error("Not enough raw materials");
+        }
       }
 
       const order = await tx.marketOrder.create({
