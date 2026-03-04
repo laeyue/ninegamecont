@@ -44,16 +44,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Already on strike" }, { status: 400 });
     }
 
+    // Check tier restriction BEFORE recording cooldown (tier is immutable — no TOCTOU risk)
+    const teamCheck = await prisma.team.findUnique({ where: { id: teamId }, select: { tier: true } });
+    if (!teamCheck) {
+      return NextResponse.json({ success: false, error: "Team not found" }, { status: 404 });
+    }
+    if (teamCheck.tier !== Tier.PERIPHERY) {
+      return NextResponse.json({ success: false, error: "Only Periphery nations can call a worker strike" }, { status: 403 });
+    }
+
     // Record cooldown BEFORE the async DB transaction to prevent TOCTOU race
     sabotageState.recordSabotage(teamId);
 
     const result = await prisma.$transaction(async (tx) => {
       const team = await tx.team.findUnique({ where: { id: teamId } });
       if (!team) throw new Error("Team not found");
-
-      if (team.tier !== Tier.PERIPHERY) {
-        throw new Error("Only Periphery nations can call a worker strike");
-      }
 
       if (!team.fdiInvestorId) {
         throw new Error("No FDI investor — a strike requires a foreign investor to hurt");

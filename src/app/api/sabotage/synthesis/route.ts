@@ -40,6 +40,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Check tier restriction BEFORE recording cooldown (tier is immutable — no TOCTOU risk)
+    const teamCheck = await prisma.team.findUnique({ where: { id: teamId }, select: { tier: true } });
+    if (!teamCheck) {
+      return NextResponse.json({ success: false, error: "Team not found" }, { status: 404 });
+    }
+    if (teamCheck.tier !== Tier.CORE) {
+      return NextResponse.json({ success: false, error: "Only Core nations can synthesize resources" }, { status: 403 });
+    }
+
     // Record synthesis cooldown BEFORE the async DB transaction to prevent TOCTOU race
     if (memberId) {
       sabotageState.recordSynthesis(memberId);
@@ -48,11 +57,6 @@ export async function POST(req: NextRequest) {
     const result = await prisma.$transaction(async (tx) => {
       const team = await tx.team.findUnique({ where: { id: teamId } });
       if (!team) throw new Error("Team not found");
-
-      // Only Core can synthesize
-      if (team.tier !== Tier.CORE) {
-        throw new Error("Only Core nations can synthesize resources");
-      }
 
       // Atomic conditional deduction — only deducts if wealth >= cost
       // Also increments rawMaterials in the same atomic operation.

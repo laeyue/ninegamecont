@@ -69,8 +69,15 @@ export async function PUT(request: NextRequest) {
     if (body.gameFrozen !== undefined) {
       updateData.gameFrozen = body.gameFrozen;
       if (body.gameFrozen) {
-        // Stop timer when game freezes
+        // Stop timer when game freezes — save remaining seconds (same as pause logic)
         updateData.timerRunning = false;
+        if (current?.timerEndsAt) {
+          const remaining = Math.max(
+            0,
+            Math.floor((new Date(current.timerEndsAt).getTime() - Date.now()) / 1000)
+          );
+          updateData.timerSeconds = remaining;
+        }
         updateData.timerEndsAt = null;
       }
     }

@@ -41,6 +41,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Check tier restriction BEFORE recording cooldown (tier is immutable — no TOCTOU risk)
+    const attackerCheck = await prisma.team.findUnique({ where: { id: attackerId }, select: { tier: true } });
+    if (!attackerCheck) {
+      return NextResponse.json({ success: false, error: "Attacker team not found" }, { status: 404 });
+    }
+    if (attackerCheck.tier !== Tier.PERIPHERY && attackerCheck.tier !== Tier.SEMI_PERIPHERY) {
+      return NextResponse.json({ success: false, error: "Only Periphery and Semi-Periphery nations can use espionage" }, { status: 403 });
+    }
+
     // Record cooldown BEFORE the async DB transaction to prevent TOCTOU race
     sabotageState.recordSabotage(attackerId);
 
@@ -49,11 +58,6 @@ export async function POST(req: NextRequest) {
     const result = await prisma.$transaction(async (tx) => {
       const attacker = await tx.team.findUnique({ where: { id: attackerId } });
       if (!attacker) throw new Error("Attacker team not found");
-
-      // Only Periphery and Semi-Periphery can use espionage
-      if (attacker.tier !== Tier.PERIPHERY && attacker.tier !== Tier.SEMI_PERIPHERY) {
-        throw new Error("Only Periphery and Semi-Periphery nations can use espionage");
-      }
 
       const target = await tx.team.findUnique({ where: { id: targetId } });
       if (!target) throw new Error("Target team not found");

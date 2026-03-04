@@ -40,16 +40,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Check tier restriction BEFORE recording cooldown (tier is immutable — no TOCTOU risk)
+    const teamCheck = await prisma.team.findUnique({ where: { id: teamId }, select: { tier: true } });
+    if (!teamCheck) {
+      return NextResponse.json({ success: false, error: "Team not found" }, { status: 404 });
+    }
+    if (teamCheck.tier !== Tier.PERIPHERY) {
+      return NextResponse.json({ success: false, error: "Only Periphery nations can start a revolution" }, { status: 403 });
+    }
+
     // Record cooldown BEFORE the async DB transaction to prevent TOCTOU race
     sabotageState.recordSabotage(teamId);
 
     const result = await prisma.$transaction(async (tx) => {
       const team = await tx.team.findUnique({ where: { id: teamId } });
       if (!team) throw new Error("Team not found");
-
-      if (team.tier !== Tier.PERIPHERY) {
-        throw new Error("Only Periphery nations can start a revolution");
-      }
 
       if (!team.fdiInvestorId) {
         throw new Error("No FDI investor — there is nothing to revolt against");

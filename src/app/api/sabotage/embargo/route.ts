@@ -45,17 +45,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Target is already under an embargo" }, { status: 400 });
     }
 
+    // Check tier restriction BEFORE recording cooldown (tier is immutable — no TOCTOU risk)
+    const attackerCheck = await prisma.team.findUnique({ where: { id: attackerId }, select: { tier: true } });
+    if (!attackerCheck) {
+      return NextResponse.json({ success: false, error: "Attacker team not found" }, { status: 404 });
+    }
+    if (attackerCheck.tier !== Tier.CORE && attackerCheck.tier !== Tier.SEMI_PERIPHERY) {
+      return NextResponse.json({ success: false, error: "Only Core and Semi-Periphery nations can impose trade embargoes" }, { status: 403 });
+    }
+
     // Record cooldown BEFORE the async DB transaction to prevent TOCTOU race
     sabotageState.recordSabotage(attackerId);
 
     const result = await prisma.$transaction(async (tx) => {
       const attacker = await tx.team.findUnique({ where: { id: attackerId } });
       if (!attacker) throw new Error("Attacker team not found");
-
-      // Only Core and Semi-Periphery can impose embargoes
-      if (attacker.tier !== Tier.CORE && attacker.tier !== Tier.SEMI_PERIPHERY) {
-        throw new Error("Only Core and Semi-Periphery nations can impose trade embargoes");
-      }
 
       const target = await tx.team.findUnique({ where: { id: targetId } });
       if (!target) throw new Error("Target team not found");

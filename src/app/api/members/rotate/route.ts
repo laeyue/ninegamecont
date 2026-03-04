@@ -26,7 +26,9 @@ export async function POST(req: NextRequest) {
     sseBroadcaster.emit(SSE_EVENTS.ROLES_ROTATED, { teamId, members: updatedMembers });
 
     return NextResponse.json({ success: true, data: { members: updatedMembers } });
-  } catch {
-    return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+  } catch (error) {
+    console.error("POST /api/members/rotate error:", error);
+    const message = error instanceof Error ? error.message : "Server error";
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

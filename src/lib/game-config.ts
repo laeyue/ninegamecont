@@ -14,6 +14,7 @@ export const TIER_DEFAULTS: Record<
 export const MANUFACTURE_OUTPUT: Partial<Record<Tier, number>> = {
   [Tier.CORE]: 80,
   [Tier.SEMI_PERIPHERY]: 30,
+  [Tier.PERIPHERY]: 20, // Only possible via FDI tech boost
 };
 
 // ---------- Mine cooldowns (milliseconds) ----------
@@ -26,6 +27,7 @@ export const MINE_COOLDOWN_MS: Partial<Record<Tier, number>> = {
 export const MANUFACTURE_COOLDOWN_MS: Partial<Record<Tier, number>> = {
   [Tier.CORE]: 5000,
   [Tier.SEMI_PERIPHERY]: 8000,
+  [Tier.PERIPHERY]: 12000, // Long cooldown — can catch up slowly via FDI
 };
 
 // ---------- FDI tax rate ----------
