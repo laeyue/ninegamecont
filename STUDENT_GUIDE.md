@@ -88,7 +88,7 @@ Manufacturers convert raw materials into goods for profit. Each manufacture cycl
 | Semi-Periphery | +$35 | 10 seconds | Must have raw materials |
 | Periphery | +$35 | 8 seconds | Only possible after receiving FDI or reaching tech ≥ 1 |
 
-**Periphery manufacturing:** If your Periphery team receives Foreign Direct Investment, you gain the ability to manufacture — but 20% of your manufacturing profit is automatically sent to the Core nation that invested in you.
+**FDI and Manufacturing:** If your team receives Foreign Direct Investment, **20% of your manufacturing profit** is automatically sent to the Core nation that invested in you. For Periphery, this is how you unlock manufacturing. For Semi-Periphery, this is a trade-off: you give up 20% of profits in exchange for +1 Tech Level (which increases your base factory output).
 
 **Tech scaling:** A Periphery nation that reaches Tech Level 3 (through espionage) manufactures at the same $50 rate as Core!
 
@@ -125,7 +125,7 @@ Not all tiers can use all sabotage actions:
 
 ### Foreign Direct Investment (FDI) Proposal
 - **Who can use:** Core only
-- **Cost:** Free
+- **Cost:** Free (but comes with a **2-minute** cooldown for your entire team)
 - **Effect:** Proposes investment in a Periphery or Semi-Periphery team. **All members of the target team vote** to accept or reject within 30 seconds. Majority wins.
 - **If accepted:** Target gains +1 Tech Level & can manufacture (if they couldn't already), but 20% of manufacturing profits go to the Core investor
 - **Use it to:** Establish a profitable partnership — but the target can fight back with Strikes and Revolution
@@ -219,11 +219,11 @@ The teacher can trigger special events from the admin dashboard.
 | Mine Cooldown | — | 6s | 2s |
 | Manufacture Profit | +$50 | +$35 | +$35 (needs tech ≥ 1) |
 | Manufacture Cooldown | 6s | 10s | 8s |
-| FDI Tax on Manufacture | — | — | 20% to investor |
+| FDI Tax on Manufacture | — | 20% to investor (if FDI) | 20% to investor (if FDI) |
 
 | Sabotage Action | Available To | Cost | Cooldown |
 |----------------|-------------|------|----------|
-| FDI Proposal | Core only | Free | 15s (team) |
+| FDI Proposal | Core only | Free | 2 minutes (team) |
 | Tariff | Core only | $40 | 15s (team) |
 | Embargo | Core, Semi-P | $50 | 15s (team) |
 | Espionage | Periphery, Semi-P | $0 / $25 on fail | 15s (team) |
