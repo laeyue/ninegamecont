@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { Globe, Users, BookOpen } from "lucide-react";
+import Link from "next/link";
 import type { TeamData } from "@/types";
 import { TIER_LABELS } from "@/lib/game-config";
 import { getTierTheme } from "@/lib/utils";
@@ -13,12 +13,7 @@ interface TeamSelectorProps {
 }
 
 export function TeamSelector({ teams, onSelect }: TeamSelectorProps) {
-  const [showTutorial, setShowTutorial] = useState(false);
   const tiers = ["CORE", "SEMI_PERIPHERY", "PERIPHERY"] as const;
-
-  if (showTutorial) {
-    return <TutorialDialog onComplete={() => setShowTutorial(false)} />;
-  }
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-6">
@@ -80,13 +75,13 @@ export function TeamSelector({ teams, onSelect }: TeamSelectorProps) {
         )}
 
         {/* How to Play button */}
-        <button
-          onClick={() => setShowTutorial(true)}
+        <Link
+          href="/guide"
           className="mt-6 w-full flex items-center justify-center gap-2 bg-gray-800/60 border border-gray-700 hover:border-blue-500/50 hover:bg-gray-800 text-gray-300 hover:text-white rounded-lg py-3 px-4 transition-all text-sm font-medium"
         >
           <BookOpen className="h-4 w-4" />
-          How to Play
-        </button>
+          Read Player Guide
+        </Link>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
-import { Clock, Users } from "lucide-react";
+import { Clock, Users, BookOpen } from "lucide-react";
+import Link from "next/link";
 import type { TeamData } from "@/types";
 import { getTierTheme } from "@/lib/utils";
 import { TIER_LABELS } from "@/lib/game-config";
@@ -35,10 +36,18 @@ export function GameWaiting({ team, memberName }: GameWaitingProps) {
           </div>
         </div>
 
-        <div className="flex items-center justify-center gap-2 text-xs text-gray-600">
+        <div className="flex items-center justify-center gap-2 text-xs text-gray-600 mb-6">
           <Users className="h-3.5 w-3.5" />
           <span>All players should join before the game starts</span>
         </div>
+
+        <Link
+          href="/guide"
+          className="inline-flex items-center justify-center gap-2 bg-gray-800/60 border border-gray-700 hover:border-blue-500/50 hover:bg-gray-800 text-gray-300 hover:text-white rounded-lg py-3 px-6 transition-all text-sm font-medium w-full"
+        >
+          <BookOpen className="h-4 w-4" />
+          Read Player Guide
+        </Link>
       </div>
     </div>
   );
