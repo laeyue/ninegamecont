@@ -16,8 +16,6 @@ export interface Member {
 // SEMI_PERIPHERY / PERIPHERY — MINER + MANUFACTURER + SABOTEUR
 // We assign roles in this order as members join; extras get the last role
 
-const ROLE_ORDER_MINE_CAPABLE: MemberRole[] = ["MINER", "MANUFACTURER", "SABOTEUR"];
-const ROLE_ORDER_CORE: MemberRole[] = ["MANUFACTURER", "SABOTEUR"];
 
 class MemberRegistry {
   // teamId -> memberId -> Member
@@ -109,7 +107,7 @@ class MemberRegistry {
   }
 
   // Rotate roles within a team: shift the *roles* among the existing *members*
-  rotateRoles(teamId: string, isCoreTeam: boolean): Member[] {
+  rotateRoles(teamId: string, _isCoreTeam: boolean): Member[] {
     const members = this.getTeamMembers(teamId);
     if (members.length <= 1) return members;
 

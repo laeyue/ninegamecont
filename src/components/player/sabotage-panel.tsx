@@ -63,7 +63,6 @@ export function SabotagePanel({ team, allTeams, gameState, memberId }: SabotageP
   const canEmbargo = isCore || isSemiP;
   const canEspionage = isPeriphery || isSemiP;
   const canStrike = isPeriphery && !!team.fdiInvestorId;
-  const canRevolution = isPeriphery && !!team.fdiInvestorId;
   const canTariff = isCore;
   const canFdi = isCore;
 
