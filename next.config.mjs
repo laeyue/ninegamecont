@@ -6,7 +6,9 @@ const nextConfig = {
     unoptimized: true,
   },
   // Ensure pg + prisma are properly included in standalone build
-  serverExternalPackages: ["pg", "@prisma/client", "@prisma/adapter-pg"],
+  experimental: {
+    serverComponentsExternalPackages: ["pg", "@prisma/client", "@prisma/adapter-pg"],
+  },
 };
 
 export default nextConfig;
