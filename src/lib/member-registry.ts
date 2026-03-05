@@ -107,7 +107,7 @@ class MemberRegistry {
   }
 
   // Rotate roles within a team: shift the *roles* among the existing *members*
-  rotateRoles(teamId: string, _isCoreTeam: boolean): Member[] {
+  rotateRoles(teamId: string): Member[] {
     const members = this.getTeamMembers(teamId);
     if (members.length <= 1) return members;
 

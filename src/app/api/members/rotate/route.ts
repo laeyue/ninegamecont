@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { memberRegistry } from "@/lib/member-registry";
 import { prisma } from "@/lib/prisma";
-import { Tier } from "@prisma/client";
 import { sseBroadcaster, SSE_EVENTS } from "@/lib/sse";
 
 export const dynamic = "force-dynamic";
@@ -19,8 +18,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Team not found" }, { status: 404 });
     }
 
-    const isCoreTeam = team.tier === Tier.CORE;
-    const updatedMembers = memberRegistry.rotateRoles(teamId, isCoreTeam);
+    const updatedMembers = memberRegistry.rotateRoles(teamId);
 
     // Broadcast so all connected players on this team update their role
     sseBroadcaster.emit(SSE_EVENTS.ROLES_ROTATED, { teamId, members: updatedMembers });
