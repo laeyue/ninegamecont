@@ -20,7 +20,7 @@ export default function GuidePage() {
                     <section className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
                         <p className="mb-4 text-lg text-white font-medium">Join at the IP provided by your facilitator.</p>
                         <p className="mb-4">
-                            You are part of a team representing a country in a simplified global economy. Some countries start rich with advanced technology. Others start poor with only raw materials. Your goal is to grow your country's wealth by trading, manufacturing, and making strategic decisions—while navigating the same inequalities that shape the real world.
+                            You are part of a team representing a country in a simplified global economy. Some countries start rich with advanced technology. Others start poor with only raw materials. Your goal is to grow your country&apos;s wealth by trading, manufacturing, and making strategic decisions—while navigating the same inequalities that shape the real world.
                         </p>
                         <p className="mb-2 text-gray-400 text-sm font-semibold uppercase tracking-wider">The simulation demonstrates:</p>
                         <ul className="list-disc pl-6 space-y-2 text-gray-300 marker:text-blue-500">
@@ -131,7 +131,7 @@ export default function GuidePage() {
                     <section className="bg-blue-900/10 border border-blue-900/30 rounded-xl p-6">
                         <h2 className="text-xl font-bold text-blue-400 mb-4">How to Play</h2>
                         <ol className="list-decimal pl-5 space-y-2 text-sm text-gray-300 marker:text-blue-500 font-medium">
-                            <li>Connect via the IP address on your phone's browser.</li>
+                            <li>Connect via the IP address on your phone&apos;s browser.</li>
                             <li>Pick your assigned group.</li>
                             <li>Wait for the facilitator to start the game.</li>
                             <li><strong>Miners:</strong> Mine & list on the market.</li>

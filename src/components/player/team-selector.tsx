@@ -5,7 +5,6 @@ import Link from "next/link";
 import type { TeamData } from "@/types";
 import { TIER_LABELS } from "@/lib/game-config";
 import { getTierTheme } from "@/lib/utils";
-import { TutorialDialog } from "./tutorial-dialog";
 
 interface TeamSelectorProps {
   teams: TeamData[];
