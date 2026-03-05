@@ -5,7 +5,7 @@ import type { TeamData, GameStateData } from "@/types";
 import type { MemberRole } from "@/hooks/use-member";
 import { TIER_LABELS } from "@/lib/game-config";
 import { getTierTheme } from "@/lib/utils";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 const ROLE_BADGE: Record<MemberRole, { label: string; color: string }> = {
   MINER: { label: "Miner", color: "text-yellow-400 bg-yellow-900/30 border-yellow-700/40" },
@@ -62,6 +62,7 @@ export function Hud({ team, gameState, memberName, role, onLogout }: HudProps) {
           label="Wealth"
           value={`$${team.wealth}`}
           theme={theme}
+          numericValue={team.wealth}
         />
         <div className="w-px h-8 bg-white/10" />
         <StatItem
@@ -69,6 +70,7 @@ export function Hud({ team, gameState, memberName, role, onLogout }: HudProps) {
           label="Materials"
           value={String(team.rawMaterials)}
           theme={theme}
+          numericValue={team.rawMaterials}
         />
         <div className="w-px h-8 bg-white/10" />
         <StatItem
@@ -76,6 +78,7 @@ export function Hud({ team, gameState, memberName, role, onLogout }: HudProps) {
           label="Tech"
           value={`Lv.${team.techLevel}`}
           theme={theme}
+          numericValue={team.techLevel}
         />
       </div>
 
@@ -94,17 +97,48 @@ function StatItem({
   label,
   value,
   theme,
+  numericValue,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   theme: ReturnType<typeof getTierTheme>;
+  numericValue?: number;
 }) {
+  const [animations, setAnimations] = useState<{ id: string; diff: number }[]>([]);
+  const prevValueRef = useRef<number | undefined>(numericValue);
+
+  useEffect(() => {
+    if (numericValue !== undefined && prevValueRef.current !== undefined) {
+      const diff = numericValue - prevValueRef.current;
+      if (diff !== 0) {
+        const id = Math.random().toString();
+        setAnimations((prev) => [...prev, { id, diff }]);
+        setTimeout(() => {
+          setAnimations((prev) => prev.filter((a) => a.id !== id));
+        }, 1000);
+      }
+    }
+    prevValueRef.current = numericValue;
+  }, [numericValue]);
+
   return (
     <div className="flex flex-col items-center gap-0.5">
       <div className={`flex items-center gap-1 ${theme.accent}`}>
         {icon}
-        <span className="text-lg font-bold">{value}</span>
+        <span className="text-lg font-bold relative inline-block">
+          {value}
+          {animations.map((a) => (
+            <span
+              key={a.id}
+              className={`absolute left-1/2 -ml-2 -top-2 text-xs font-black pointer-events-none drop-shadow-md animate-floatUp ${a.diff > 0 ? "text-green-400" : "text-red-500"
+                }`}
+            >
+              {a.diff > 0 ? "+" : ""}
+              {a.diff}
+            </span>
+          ))}
+        </span>
       </div>
       <span className="text-[10px] text-gray-500 uppercase tracking-wider">
         {label}

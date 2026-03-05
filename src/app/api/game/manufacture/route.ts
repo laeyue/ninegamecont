@@ -8,8 +8,10 @@ import type { ManufactureRequest } from "@/types";
 
 export const dynamic = 'force-dynamic';
 
-// In-memory cooldown tracking
-const lastManufactureTime = new Map<string, number>();
+// In-memory cooldown tracking per player
+const globalForManufacture = globalThis as unknown as { lastManufactureTime: Map<string, number> | undefined };
+const lastManufactureTime = globalForManufacture.lastManufactureTime ?? new Map<string, number>();
+if (process.env.NODE_ENV !== "production") globalForManufacture.lastManufactureTime = lastManufactureTime;
 
 export async function POST(request: NextRequest) {
   try {
@@ -58,73 +60,80 @@ export async function POST(request: NextRequest) {
     lastManufactureTime.set(memberId, now);
 
     // Use transaction for atomicity
-    const result = await prisma.$transaction(async (tx) => {
-      const team = await tx.team.findUnique({ where: { id: teamId } });
-      if (!team) throw new Error("Team not found");
+    let result;
+    try {
+      result = await prisma.$transaction(async (tx) => {
+        const team = await tx.team.findUnique({ where: { id: teamId } });
+        if (!team) throw new Error("Team not found");
 
-      // Check strike
-      const strike = sabotageState.isOnStrike(teamId);
-      if (strike) {
-        const remaining = Math.ceil((strike.until - Date.now()) / 1000);
-        throw new Error(`Worker strike in progress (${remaining}s remaining)`);
-      }
+        // Check strike
+        const strike = sabotageState.isOnStrike(teamId);
+        if (strike) {
+          const remaining = Math.ceil((strike.until - Date.now()) / 1000);
+          throw new Error(`Worker strike in progress (${remaining}s remaining)`);
+        }
 
-      // Validate ability
-      if (!canManufacture(team.tier, team.techLevel)) {
-        throw new Error("Cannot manufacture: insufficient tech level");
-      }
+        // Validate ability
+        if (!canManufacture(team.tier, team.techLevel)) {
+          throw new Error("Cannot manufacture: insufficient tech level");
+        }
 
-      // Calculate output
-      const baseOutput = getManufactureOutput(team.tier);
-      let teamProfit = baseOutput;
-      let investorProfit = 0;
-      let investorTeam = null;
+        // Calculate output
+        const baseOutput = getManufactureOutput(team.tier, team.techLevel);
+        let teamProfit = baseOutput;
+        let investorProfit = 0;
+        let investorTeam = null;
 
-      // Apply FDI tax if applicable
-      if (team.fdiInvestorId) {
-        investorProfit = Math.floor(baseOutput * FDI_TAX_RATE);
-        teamProfit = baseOutput - investorProfit;
+        // Apply FDI tax if applicable
+        if (team.fdiInvestorId) {
+          investorProfit = Math.floor(baseOutput * FDI_TAX_RATE);
+          teamProfit = baseOutput - investorProfit;
 
-        // Credit investor
-        investorTeam = await tx.team.update({
-          where: { id: team.fdiInvestorId },
-          data: { wealth: { increment: investorProfit } },
+          // Credit investor
+          investorTeam = await tx.team.update({
+            where: { id: team.fdiInvestorId },
+            data: { wealth: { increment: investorProfit } },
+          });
+        }
+
+        // Atomic conditional update — only decrements if raw_materials >= 1
+        // This prevents the TOCTOU race where two concurrent transactions both
+        // read rawMaterials=1, both pass a check, and both decrement to -1.
+        const updateResult: { id: string }[] = await tx.$queryRawUnsafe(
+          `UPDATE "teams"
+           SET "raw_materials" = "raw_materials" - 1,
+               "wealth" = "wealth" + $1
+           WHERE "id" = $2 AND "raw_materials" >= 1
+           RETURNING "id"`,
+          teamProfit,
+          teamId
+        );
+
+        if (updateResult.length === 0) {
+          throw new Error("Not enough raw materials");
+        }
+
+        // Re-fetch the updated team to get current state for broadcasting
+        const updated = await tx.team.findUnique({ where: { id: teamId } });
+        if (!updated) throw new Error("Team not found after update");
+
+        // Log the event
+        let logMessage = `${team.name} manufactured: +$${teamProfit}`;
+        if (investorTeam) {
+          logMessage += ` ($${investorProfit} extracted by ${investorTeam.name} via FDI)`;
+        }
+
+        const log = await tx.gameEventLog.create({
+          data: { message: logMessage },
         });
-      }
 
-      // Atomic conditional update — only decrements if raw_materials >= 1
-      // This prevents the TOCTOU race where two concurrent transactions both
-      // read rawMaterials=1, both pass a check, and both decrement to -1.
-      const updateResult: { id: string }[] = await tx.$queryRawUnsafe(
-        `UPDATE "teams"
-         SET "raw_materials" = "raw_materials" - 1,
-             "wealth" = "wealth" + $1
-         WHERE "id" = $2 AND "raw_materials" >= 1
-         RETURNING "id"`,
-        teamProfit,
-        teamId
-      );
-
-      if (updateResult.length === 0) {
-        throw new Error("Not enough raw materials");
-      }
-
-      // Re-fetch the updated team to get current state for broadcasting
-      const updated = await tx.team.findUnique({ where: { id: teamId } });
-      if (!updated) throw new Error("Team not found after update");
-
-      // Log the event
-      let logMessage = `${team.name} manufactured: +$${teamProfit}`;
-      if (investorTeam) {
-        logMessage += ` ($${investorProfit} extracted by ${investorTeam.name} via FDI)`;
-      }
-
-      const log = await tx.gameEventLog.create({
-        data: { message: logMessage },
+        return { updated, investorTeam, log };
       });
-
-      return { updated, investorTeam, log };
-    });
+    } catch (txError) {
+      // Revert the cooldown if the database transaction blocked the action
+      lastManufactureTime.set(memberId, lastTime);
+      throw txError;
+    }
 
     // Broadcast updates
     sseBroadcaster.emit(SSE_EVENTS.TEAM_UPDATE, { team: result.updated });

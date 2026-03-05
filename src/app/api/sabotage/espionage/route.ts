@@ -69,10 +69,13 @@ export async function POST(req: NextRequest) {
 
       if (succeeded) {
         // +1 tech to attacker
-        const updatedAttacker = await tx.team.update({
-          where: { id: attackerId },
+        const updatedAttackerResult = await tx.team.updateMany({
+          where: { id: attackerId, techLevel: { lt: target.techLevel } },
           data: { techLevel: { increment: 1 } },
         });
+        if (updatedAttackerResult.count === 0) throw new Error("Target no longer has a tech advantage");
+        const updatedAttacker = await tx.team.findUnique({ where: { id: attackerId } });
+        if (!updatedAttacker) throw new Error("Attacker not found after update");
 
         const log = await tx.gameEventLog.create({
           data: { message: `${attacker.name} STOLE technology from ${target.name}! (+1 tech level)` },

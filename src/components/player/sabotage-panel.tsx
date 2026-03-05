@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Skull, Ban, Eye, Megaphone, Flame, Loader2, Scale, FlaskConical } from "lucide-react";
+import { Skull, Ban, Eye, Megaphone, Flame, Loader2, Scale, Handshake } from "lucide-react";
 import type { TeamData, GameStateData } from "@/types";
 import { getTierTheme, cn } from "@/lib/utils";
 import {
@@ -9,10 +9,7 @@ import {
   ESPIONAGE_COST_ON_FAIL,
   ESPIONAGE_SUCCESS_CHANCE,
   STRIKE_INVESTOR_PENALTY,
-  REVOLUTION_WEALTH_THRESHOLD,
   TARIFF_COST,
-  SYNTHESIS_COST,
-  SYNTHESIS_COOLDOWN_MS,
 } from "@/lib/game-config";
 import { Tier } from "@prisma/client";
 
@@ -37,7 +34,6 @@ export function SabotagePanel({ team, allTeams, gameState, memberId }: SabotageP
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [targetId, setTargetId] = useState("");
   const [status, setStatus] = useState<SabotageStatus>({ embargoes: [], strikes: [], tariffs: [] });
-  const [synthCooldown, setSynthCooldown] = useState(0);
 
   // Poll sabotage status
   const fetchStatus = useCallback(async () => {
@@ -54,15 +50,6 @@ export function SabotagePanel({ team, allTeams, gameState, memberId }: SabotageP
     return () => clearInterval(interval);
   }, [fetchStatus]);
 
-  // Synthesis cooldown timer (client-side display)
-  useEffect(() => {
-    if (synthCooldown <= 0) return;
-    const interval = setInterval(() => {
-      setSynthCooldown((prev) => Math.max(0, prev - 1));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [synthCooldown]);
-
   const showMessage = (text: string, type: "success" | "error") => {
     setMessage({ text, type });
     setTimeout(() => setMessage(null), 4000);
@@ -76,9 +63,9 @@ export function SabotagePanel({ team, allTeams, gameState, memberId }: SabotageP
   const canEmbargo = isCore || isSemiP;
   const canEspionage = isPeriphery || isSemiP;
   const canStrike = isPeriphery && !!team.fdiInvestorId;
-  const canRevolution = isPeriphery && !!team.fdiInvestorId && team.wealth <= REVOLUTION_WEALTH_THRESHOLD;
+  const canRevolution = isPeriphery && !!team.fdiInvestorId;
   const canTariff = isCore;
-  const canSynthesize = isCore;
+  const canFdi = isCore;
 
   // Targets for embargo: all teams except self
   const embargoTargets = allTeams.filter((t) => t.id !== team.id);
@@ -86,6 +73,8 @@ export function SabotagePanel({ team, allTeams, gameState, memberId }: SabotageP
   const espionageTargets = allTeams.filter((t) => t.id !== team.id && t.techLevel > team.techLevel);
   // Targets for tariff: all teams except self (typically used on Periphery/Semi-P)
   const tariffTargets = allTeams.filter((t) => t.id !== team.id);
+  // Targets for FDI: Periphery teams without an FDI investor
+  const fdiTargets = allTeams.filter((t) => t.id !== team.id && (t.tier === "PERIPHERY" || t.tier === "SEMI_PERIPHERY") && !t.fdiInvestorId);
 
   // Check if our team is embargoed, on strike, or tariffed
   const ourEmbargo = status.embargoes.find((e) => e.targetTeamId === team.id);
@@ -212,19 +201,19 @@ export function SabotagePanel({ team, allTeams, gameState, memberId }: SabotageP
     }
   };
 
-  const handleSynthesis = async () => {
-    if (loading || synthCooldown > 0) return;
-    setLoading("synthesis");
+  const handleFdiProposal = async () => {
+    if (!targetId || loading) return;
+    setLoading("fdi");
     try {
-      const res = await fetch("/api/sabotage/synthesis", {
+      const res = await fetch("/api/sabotage/fdi-proposal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamId: team.id, memberId }),
+        body: JSON.stringify({ investorId: team.id, targetId, memberId }),
       });
       const data = await res.json();
       if (data.success) {
         showMessage(data.data.message, "success");
-        setSynthCooldown(Math.ceil(SYNTHESIS_COOLDOWN_MS / 1000));
+        setTargetId("");
       } else {
         showMessage(data.error, "error");
       }
@@ -297,16 +286,30 @@ export function SabotagePanel({ team, allTeams, gameState, memberId }: SabotageP
           />
         )}
 
-        {/* --- SYNTHESIS (Core only) --- */}
-        {canSynthesize && (
+        {/* --- FDI PROPOSAL (Core only) --- */}
+        {canFdi && (
           <SabotageAction
-            icon={<FlaskConical className="h-4 w-4" />}
-            title="Resource Synthesis"
-            description={`Synthesize 1 raw material for $${SYNTHESIS_COST}. ${synthCooldown > 0 ? `Cooldown: ${synthCooldown}s` : "10s cooldown"}`}
+            icon={<Handshake className="h-4 w-4" />}
+            title="Propose FDI"
+            description={fdiTargets.length > 0 ? "Invest in a Periphery nation — they vote to accept or reject" : "No eligible Periphery teams"}
             color="bg-emerald-950/30 border-emerald-900/30 text-emerald-300 hover:bg-emerald-950/50"
-            disabled={isFrozen || !!loading || team.wealth < SYNTHESIS_COST || synthCooldown > 0}
-            loading={loading === "synthesis"}
-            onAction={handleSynthesis}
+            disabled={isFrozen || !!loading || fdiTargets.length === 0}
+            loading={loading === "fdi"}
+            onAction={handleFdiProposal}
+            targetSelector={
+              fdiTargets.length > 0 ? (
+                <select
+                  value={targetId}
+                  onChange={(e) => setTargetId(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white mt-2"
+                >
+                  <option value="">Select target...</option>
+                  {fdiTargets.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name} (Tech {t.techLevel})</option>
+                  ))}
+                </select>
+              ) : undefined
+            }
           />
         )}
 
@@ -380,17 +383,14 @@ export function SabotagePanel({ team, allTeams, gameState, memberId }: SabotageP
           />
         )}
 
-        {/* --- REVOLUTION (Periphery, desperate) --- */}
+        {/* --- REVOLUTION (Periphery with FDI) --- */}
         {isPeriphery && team.fdiInvestorId && (
           <SabotageAction
             icon={<Flame className="h-4 w-4" />}
             title="Revolution"
-            description={canRevolution
-              ? "Break FDI link! Costs half your wealth and all tech."
-              : `Requires wealth <= $${REVOLUTION_WEALTH_THRESHOLD} (you have $${team.wealth})`
-            }
+            description={"Break FDI link! Costs half your wealth and all tech."}
             color="bg-red-950/30 border-red-900/30 text-red-300 hover:bg-red-950/50"
-            disabled={isFrozen || !!loading || !canRevolution}
+            disabled={isFrozen || !!loading}
             loading={loading === "revolution"}
             onAction={handleRevolution}
           />

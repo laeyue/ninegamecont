@@ -11,6 +11,7 @@ import { Hud } from "@/components/player/hud";
 import { ActionPanel } from "@/components/player/action-panel";
 import { MarketPanel } from "@/components/player/market-panel";
 import { SabotagePanel } from "@/components/player/sabotage-panel";
+import { FdiVoteDialog } from "@/components/player/fdi-vote-dialog";
 import { GameFrozen } from "@/components/player/game-frozen";
 import { GameWaiting } from "@/components/player/game-waiting";
 import { NewsFlash, type NewsItem } from "@/components/player/news-flash";
@@ -22,6 +23,11 @@ export default function PlayPage() {
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
   const [newsItem, setNewsItem] = useState<NewsItem | null>(null);
+  const [fdiProposal, setFdiProposal] = useState<{
+    investorName: string;
+    targetTeamId: string;
+    expiresAt: number;
+  } | null>(null);
   const newsIdCounter = useRef(0);
 
   const pushNews = useCallback((headline: string, type: NewsItem["type"]) => {
@@ -62,15 +68,13 @@ export default function PlayPage() {
   // Listen for SSE events — role rotations + news flash triggers + game reset
   useSSE({
     "game-reset": () => {
-      // Clear all member data so players must re-enter their name
-      // Remove member entries for all teams (player may have switched teams before)
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith("member:")) {
-          localStorage.removeItem(key);
-        }
+      // Clear all member data completely, wiping their UUID as well so they must rejoin
+      const tutorialStatus = localStorage.getItem("tutorialDone");
+      localStorage.clear();
+      if (tutorialStatus) {
+        localStorage.setItem("tutorialDone", tutorialStatus);
       }
-      localStorage.removeItem("selectedTeamId");
+
       resetMember();
       setSelectedTeamId(null);
       pushNews("GAME RESET — All players must rejoin!", "system");
@@ -108,6 +112,28 @@ export default function PlayPage() {
     "resource-synthesized": (data: unknown) => {
       const d = data as { teamName: string; cost: number };
       pushNews(`${d.teamName} synthesized raw materials, bypassing the market!`, "diplomacy");
+    },
+    "fdi-proposal": (data: unknown) => {
+      const d = data as { investorName: string; targetTeamId: string; expiresAt: number };
+      // Show dialog only if this proposal is for our team
+      if (d.targetTeamId === selectedTeamId) {
+        setFdiProposal({
+          investorName: d.investorName,
+          targetTeamId: d.targetTeamId,
+          expiresAt: d.expiresAt,
+        });
+      } else {
+        pushNews(`${d.investorName} proposed FDI to a Periphery nation!`, "diplomacy");
+      }
+    },
+    "fdi-vote-result": (data: unknown) => {
+      const d = data as { investorName: string; targetName: string; result: string };
+      setFdiProposal(null); // Close dialog
+      if (d.result === "accepted") {
+        pushNews(`${d.targetName} ACCEPTED FDI from ${d.investorName}!`, "diplomacy");
+      } else {
+        pushNews(`${d.targetName} REJECTED FDI from ${d.investorName}!`, "crisis");
+      }
     },
     "game-state-update": (data: unknown) => {
       const d = data as { state: { gameFrozen: boolean } };
@@ -188,6 +214,17 @@ export default function PlayPage() {
 
       {/* Game Frozen Overlay */}
       {!isPreGame && gameState?.gameFrozen && <GameFrozen team={team} allTeams={allTeams} />}
+
+      {/* FDI Vote Dialog */}
+      {fdiProposal && member && (
+        <FdiVoteDialog
+          investorName={fdiProposal.investorName}
+          targetTeamId={fdiProposal.targetTeamId}
+          expiresAt={fdiProposal.expiresAt}
+          memberId={member.memberId}
+          onClose={() => setFdiProposal(null)}
+        />
+      )}
 
       {/* HUD */}
       <Hud

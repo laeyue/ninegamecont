@@ -154,7 +154,7 @@ export function ActionPanel({ team, gameState, role, memberId }: ActionPanelProp
               <span>
                 {mfgOnCooldown
                   ? `Manufacturing... ${(mfgRemainingMs / 1000).toFixed(1)}s`
-                  : `Manufacture (+$${getManufactureOutput(team.tier)}${team.fdiInvestorId ? " / 50% taxed" : ""})`}
+                  : `Manufacture (+$${getManufactureOutput(team.tier, team.techLevel)}${team.fdiInvestorId ? " / 50% taxed" : ""})`}
               </span>
             </div>
             {!mfgOnCooldown && (

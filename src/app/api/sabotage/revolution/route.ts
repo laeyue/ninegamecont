@@ -2,16 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sseBroadcaster, SSE_EVENTS } from "@/lib/sse";
 import { sabotageState } from "@/lib/sabotage-state";
-import { REVOLUTION_WEALTH_THRESHOLD } from "@/lib/game-config";
 import { checkGameActive, checkMemberRole } from "@/lib/game-guards";
 import { Tier } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
 // POST { teamId, memberId }
-// Periphery team with very low wealth can revolt:
+// Periphery team can revolt:
 // - Breaks FDI link permanently
-// - Loses half current wealth
+// - Costs half current wealth
 // - Tech level resets to 0
 export async function POST(req: NextRequest) {
   try {
@@ -60,23 +59,22 @@ export async function POST(req: NextRequest) {
         throw new Error("No FDI investor — there is nothing to revolt against");
       }
 
-      if (team.wealth > REVOLUTION_WEALTH_THRESHOLD) {
-        throw new Error(`Revolution requires wealth <= $${REVOLUTION_WEALTH_THRESHOLD} (you have $${team.wealth})`);
-      }
-
       const investorName = (await tx.team.findUnique({ where: { id: team.fdiInvestorId } }))?.name ?? "Unknown";
 
       const halfWealth = Math.floor(team.wealth / 2);
 
       // Apply revolution
-      const updated = await tx.team.update({
-        where: { id: teamId },
+      const updatedResult = await tx.team.updateMany({
+        where: { id: teamId, fdiInvestorId: { not: null } },
         data: {
           fdiInvestorId: null,
           wealth: team.wealth - halfWealth,
           techLevel: 0,
         },
       });
+      if (updatedResult.count === 0) throw new Error("Revolution already occurred");
+      const updated = await tx.team.findUnique({ where: { id: teamId } });
+      if (!updated) throw new Error("Team not found after update");
 
       const log = await tx.gameEventLog.create({
         data: {

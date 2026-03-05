@@ -56,4 +56,6 @@ export const SSE_EVENTS = {
   REVOLUTION: "revolution",
   TARIFF_IMPOSED: "tariff-imposed",
   RESOURCE_SYNTHESIZED: "resource-synthesized",
+  FDI_PROPOSAL: "fdi-proposal",
+  FDI_VOTE_RESULT: "fdi-vote-result",
 } as const;

@@ -6,32 +6,38 @@ export const TIER_DEFAULTS: Record<
   { wealth: number; rawMaterials: number; techLevel: number }
 > = {
   [Tier.CORE]: { wealth: 500, rawMaterials: 0, techLevel: 3 },
-  [Tier.SEMI_PERIPHERY]: { wealth: 200, rawMaterials: 10, techLevel: 1 },
-  [Tier.PERIPHERY]: { wealth: 50, rawMaterials: 30, techLevel: 0 },
+  [Tier.SEMI_PERIPHERY]: { wealth: 200, rawMaterials: 15, techLevel: 1 },
+  [Tier.PERIPHERY]: { wealth: 100, rawMaterials: 30, techLevel: 0 },
 };
 
 // ---------- Manufacture outputs ----------
 export const MANUFACTURE_OUTPUT: Partial<Record<Tier, number>> = {
-  [Tier.CORE]: 80,
-  [Tier.SEMI_PERIPHERY]: 30,
-  [Tier.PERIPHERY]: 20, // Only possible via FDI tech boost
+  [Tier.CORE]: 50,
+  [Tier.SEMI_PERIPHERY]: 35,
+  [Tier.PERIPHERY]: 35, // Cheap labor advantage when industrialized via FDI
+};
+
+// ---------- Mine wealth bonus (direct income from resource exports) ----------
+export const MINE_WEALTH_BONUS: Partial<Record<Tier, number>> = {
+  [Tier.PERIPHERY]: 5,       // Resource-rich nations earn export revenue
+  [Tier.SEMI_PERIPHERY]: 4,  // Buffed resource income
 };
 
 // ---------- Mine cooldowns (milliseconds) ----------
 export const MINE_COOLDOWN_MS: Partial<Record<Tier, number>> = {
-  [Tier.PERIPHERY]: 3000,
-  [Tier.SEMI_PERIPHERY]: 5000,
+  [Tier.PERIPHERY]: 2000,
+  [Tier.SEMI_PERIPHERY]: 6000,
 };
 
 // ---------- Manufacture cooldowns (milliseconds) ----------
 export const MANUFACTURE_COOLDOWN_MS: Partial<Record<Tier, number>> = {
-  [Tier.CORE]: 5000,
-  [Tier.SEMI_PERIPHERY]: 8000,
-  [Tier.PERIPHERY]: 12000, // Long cooldown — can catch up slowly via FDI
+  [Tier.CORE]: 6000,
+  [Tier.SEMI_PERIPHERY]: 10000,
+  [Tier.PERIPHERY]: 8000, // Cheap labor = faster factories when industrialized
 };
 
 // ---------- FDI tax rate ----------
-export const FDI_TAX_RATE = 0.5;
+export const FDI_TAX_RATE = 0.2;
 
 // ---------- Default game timer (seconds) ----------
 export const DEFAULT_TIMER_SECONDS = 1200; // 20 minutes
@@ -39,10 +45,10 @@ export const DEFAULT_TIMER_SECONDS = 1200; // 20 minutes
 // ---------- Sabotage costs & settings ----------
 export const EMBARGO_COST = 50;
 export const EMBARGO_DURATION_MS = 60_000; // 60 seconds
-export const ESPIONAGE_COST_ON_FAIL = 40;
-export const ESPIONAGE_SUCCESS_CHANCE = 0.25; // 25%
+export const ESPIONAGE_COST_ON_FAIL = 25;
+export const ESPIONAGE_SUCCESS_CHANCE = 0.10; // 10%
 export const STRIKE_DURATION_MS = 30_000; // 30 seconds
-export const STRIKE_INVESTOR_PENALTY = 30; // Core investor loses $30
+export const STRIKE_INVESTOR_PENALTY = 50; // Core investor loses $50
 export const REVOLUTION_WEALTH_THRESHOLD = 20; // wealth must be <= this
 
 // ---------- Core-exclusive sabotage ----------
@@ -72,7 +78,11 @@ export function getMineCooldownMs(tier: Tier): number {
   return MINE_COOLDOWN_MS[tier] ?? 5000;
 }
 
-export function getManufactureOutput(tier: Tier): number {
+export function getManufactureOutput(tier: Tier, techLevel: number): number {
+  // Higher tech unlocks higher-tier manufacturing (China model)
+  // Tech 3 → Core-level output, Tech 2 → Semi-level output
+  if (techLevel >= 3) return MANUFACTURE_OUTPUT[Tier.CORE] ?? 50;
+  if (techLevel >= 2) return MANUFACTURE_OUTPUT[Tier.SEMI_PERIPHERY] ?? 30;
   return MANUFACTURE_OUTPUT[tier] ?? 30;
 }
 

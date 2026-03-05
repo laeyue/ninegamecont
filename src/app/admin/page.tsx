@@ -52,6 +52,18 @@ export default function AdminPage() {
       const d = data as { teamName: string; cost: number };
       pushNews(`${d.teamName} synthesized raw materials, bypassing the market!`, "diplomacy");
     },
+    "fdi-proposal": (data: unknown) => {
+      const d = data as { investorName: string; targetName: string };
+      pushNews(`${d.investorName} proposed FDI to ${d.targetName} — vote in progress!`, "diplomacy");
+    },
+    "fdi-vote-result": (data: unknown) => {
+      const d = data as { investorName: string; targetName: string; result: string };
+      if (d.result === "accepted") {
+        pushNews(`${d.targetName} ACCEPTED FDI from ${d.investorName}!`, "diplomacy");
+      } else {
+        pushNews(`${d.targetName} REJECTED FDI from ${d.investorName}!`, "crisis");
+      }
+    },
     "event-log": (data: unknown) => {
       const d = data as { log: { message: string } };
       const msg = d.log.message;

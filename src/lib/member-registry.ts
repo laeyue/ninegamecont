@@ -62,10 +62,32 @@ class MemberRegistry {
       return updated;
     }
 
-    // Assign next available role (round-robin)
     const members = this.getTeamMembers(teamId);
-    const roleOrder = isCoreTeam ? ROLE_ORDER_CORE : ROLE_ORDER_MINE_CAPABLE;
-    const role = roleOrder[members.length % roleOrder.length];
+    const hasSaboteur = members.some(m => m.role === "SABOTEUR");
+
+    let role: MemberRole;
+    if (!hasSaboteur) {
+      if (isCoreTeam) {
+        // Priority: MANUFACTURER, then SABOTEUR
+        const hasManu = members.some(m => m.role === "MANUFACTURER");
+        role = hasManu ? "SABOTEUR" : "MANUFACTURER";
+      } else {
+        // Priority: MINER, then MANUFACTURER, then SABOTEUR
+        const hasMiner = members.some(m => m.role === "MINER");
+        const hasManu = members.some(m => m.role === "MANUFACTURER");
+        if (!hasMiner) role = "MINER";
+        else if (!hasManu) role = "MANUFACTURER";
+        else role = "SABOTEUR";
+      }
+    } else {
+      if (isCoreTeam) {
+        role = "MANUFACTURER";
+      } else {
+        const minCount = members.filter(m => m.role === "MINER").length;
+        const manCount = members.filter(m => m.role === "MANUFACTURER").length;
+        role = minCount <= manCount ? "MINER" : "MANUFACTURER";
+      }
+    }
 
     const member: Member = { memberId, teamId, name, role, joinedAt: Date.now() };
     teamMap.set(memberId, member);
@@ -86,23 +108,23 @@ class MemberRegistry {
     this.teams.clear();
   }
 
-  // Rotate roles within a team: shift everyone one slot forward in the role order
+  // Rotate roles within a team: shift the *roles* among the existing *members*
   rotateRoles(teamId: string, isCoreTeam: boolean): Member[] {
     const members = this.getTeamMembers(teamId);
-    if (members.length === 0) return [];
+    if (members.length <= 1) return members;
 
-    const roleOrder = isCoreTeam ? ROLE_ORDER_CORE : ROLE_ORDER_MINE_CAPABLE;
-    // Reassign roles cycling through roleOrder by position
     const teamMap = this.getOrCreateTeam(teamId);
 
-    // Find current index of first member's role, then shift by 1
-    const currentFirstRole = members[0].role;
-    const currentIdx = roleOrder.indexOf(currentFirstRole);
-    const shift = currentIdx === -1 ? 1 : 1; // always shift by 1
+    // Extract current roles in join order
+    const roles = members.map(m => m.role);
 
+    // Shift right by 1
+    const lastRole = roles.pop()!;
+    roles.unshift(lastRole);
+
+    // Assign back
     members.forEach((member, i) => {
-      const newRoleIdx = (i + (currentIdx === -1 ? 0 : currentIdx) + shift) % roleOrder.length;
-      const updated = { ...member, role: roleOrder[newRoleIdx] };
+      const updated = { ...member, role: roles[i] };
       teamMap.set(member.memberId, updated);
     });
 

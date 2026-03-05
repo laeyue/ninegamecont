@@ -14,7 +14,13 @@ function generateUUID(): string {
     }
   }
   const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i++) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
   bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
   bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 1
   const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
@@ -128,7 +134,7 @@ export function useMember(teamId: string | null) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ memberId: member.memberId }),
-    }).catch(() => {});
+    }).catch(() => { });
   }, [member, teamId]);
 
   // Reset member state without server call (used on game-reset SSE)

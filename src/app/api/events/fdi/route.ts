@@ -36,17 +36,20 @@ export async function POST(request: NextRequest) {
       if (!investor) throw new Error("Investor team not found");
       if (!recipient) throw new Error("Recipient team not found");
       if (investor.tier !== Tier.CORE) throw new Error("Investor must be a Core team");
-      if (recipient.tier !== Tier.PERIPHERY) throw new Error("Recipient must be a Periphery team");
+      if (recipient.tier !== Tier.PERIPHERY && recipient.tier !== Tier.SEMI_PERIPHERY) throw new Error("Recipient must be a Periphery or Semi-Periphery team");
       if (recipient.fdiInvestorId) throw new Error("Recipient already has an FDI investor");
 
       // Apply FDI: +1 tech level, set investor
-      const updatedRecipient = await tx.team.update({
-        where: { id: recipientId },
+      const updateResult = await tx.team.updateMany({
+        where: { id: recipientId, fdiInvestorId: null },
         data: {
           techLevel: { increment: 1 },
           fdiInvestorId: investorId,
         },
       });
+      if (updateResult.count === 0) throw new Error("Recipient already has an FDI investor");
+      const updatedRecipient = await tx.team.findUnique({ where: { id: recipientId } });
+      if (!updatedRecipient) throw new Error("Recipient team not found after update");
 
       const log = await tx.gameEventLog.create({
         data: {

@@ -22,6 +22,19 @@ export interface TariffEntry {
   until: number; // Date.now() + duration
 }
 
+export interface FdiProposal {
+  id: string;
+  investorId: string;
+  investorName: string;
+  targetTeamId: string;
+  targetName: string;
+  votes: Map<string, boolean>; // memberId -> accept/reject
+  totalMembers: number;
+  expiresAt: number;
+  resolved: boolean;
+  result?: "accepted" | "rejected" | "expired";
+}
+
 // Sabotage cooldown per team (prevent spam)
 const SABOTAGE_COOLDOWN_MS = 15_000; // 15s between any sabotage action per team
 
@@ -31,6 +44,8 @@ class SabotageState {
   private tariffs = new Map<string, TariffEntry>();    // targetTeamId -> entry
   private synthesisCooldowns = new Map<string, number>(); // memberId -> timestamp
   private lastSabotageTime = new Map<string, number>(); // attackerTeamId -> timestamp
+  private fdiProposals = new Map<string, FdiProposal>(); // targetTeamId -> proposal
+  private fdiCooldowns = new Map<string, number>();      // investorTeamId -> timestamp
 
   // --- Embargo ---
 
@@ -175,6 +190,73 @@ class SabotageState {
     this.tariffs.clear();
     this.synthesisCooldowns.clear();
     this.lastSabotageTime.clear();
+    this.fdiProposals.clear();
+    this.fdiCooldowns.clear();
+  }
+
+  // --- FDI Cooldown (2 minutes) ---
+
+  canProposeFdi(teamId: string): { allowed: boolean; remainingMs: number } {
+    const last = this.fdiCooldowns.get(teamId);
+    if (!last) return { allowed: true, remainingMs: 0 };
+    const elapsed = Date.now() - last;
+    const cooldown = 120_000; // 2 minutes
+    if (elapsed >= cooldown) return { allowed: true, remainingMs: 0 };
+    return { allowed: false, remainingMs: cooldown - elapsed };
+  }
+
+  recordFdiCooldown(teamId: string): void {
+    this.fdiCooldowns.set(teamId, Date.now());
+  }
+
+  // --- FDI Proposals ---
+
+  addFdiProposal(investorId: string, investorName: string, targetTeamId: string, targetName: string, totalMembers: number, durationMs: number): FdiProposal {
+    const proposal: FdiProposal = {
+      id: `fdi-${Date.now()}`,
+      investorId,
+      investorName,
+      targetTeamId,
+      targetName,
+      votes: new Map(),
+      totalMembers,
+      expiresAt: Date.now() + durationMs,
+      resolved: false,
+    };
+    this.fdiProposals.set(targetTeamId, proposal);
+    return proposal;
+  }
+
+  getFdiProposal(targetTeamId: string): FdiProposal | null {
+    const proposal = this.fdiProposals.get(targetTeamId);
+    if (!proposal) return null;
+    if (proposal.resolved) return null;
+    // Auto-expire
+    if (Date.now() > proposal.expiresAt && !proposal.resolved) {
+      proposal.resolved = true;
+      proposal.result = "expired";
+      return null;
+    }
+    return proposal;
+  }
+
+  recordFdiVote(targetTeamId: string, memberId: string, accept: boolean): FdiProposal | null {
+    const proposal = this.getFdiProposal(targetTeamId);
+    if (!proposal) return null;
+    proposal.votes.set(memberId, accept);
+    return proposal;
+  }
+
+  resolveFdiProposal(targetTeamId: string): FdiProposal | null {
+    const proposal = this.fdiProposals.get(targetTeamId);
+    if (!proposal || proposal.resolved) return null;
+
+    const accepts = Array.from(proposal.votes.values()).filter(v => v).length;
+    const rejects = Array.from(proposal.votes.values()).filter(v => !v).length;
+
+    proposal.resolved = true;
+    proposal.result = accepts > rejects ? "accepted" : "rejected";
+    return proposal;
   }
 }
 

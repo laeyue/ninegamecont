@@ -24,7 +24,7 @@ export function GodMode({ teams, gameState }: GodModeProps) {
   const [confirmDebt, setConfirmDebt] = useState(false);
 
   const coreTeams = teams.filter((t) => t.tier === Tier.CORE);
-  const peripheryTeams = teams.filter((t) => t.tier === Tier.PERIPHERY && !t.fdiInvestorId);
+  const peripheryTeams = teams.filter((t) => (t.tier === Tier.PERIPHERY || t.tier === Tier.SEMI_PERIPHERY) && !t.fdiInvestorId);
 
   const handleDebtCrisis = async () => {
     if (!confirmDebt) {
@@ -62,14 +62,14 @@ export function GodMode({ teams, gameState }: GodModeProps) {
     setMessage(null);
 
     try {
-      const res = await fetch("/api/events/fdi", {
+      const res = await fetch("/api/sabotage/fdi-proposal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ investorId, recipientId }),
+        body: JSON.stringify({ investorId, targetId: recipientId }),
       });
       const data = await res.json();
       if (data.success) {
-        setMessage("FDI applied successfully!");
+        setMessage("FDI proposal sent! Periphery team is voting...");
         setShowFdi(false);
         setInvestorId("");
         setRecipientId("");
@@ -95,11 +95,10 @@ export function GodMode({ teams, gameState }: GodModeProps) {
         <button
           onClick={handleDebtCrisis}
           disabled={isFrozen || loading === "debt"}
-          className={`w-full rounded-lg py-3 px-4 text-left transition-all border ${
-            confirmDebt
-              ? "bg-red-900/50 border-red-600 text-red-200"
-              : "bg-red-950/30 border-red-900/30 text-red-300 hover:bg-red-950/50"
-          } disabled:opacity-50 disabled:cursor-not-allowed`}
+          className={`w-full rounded-lg py-3 px-4 text-left transition-all border ${confirmDebt
+            ? "bg-red-900/50 border-red-600 text-red-200"
+            : "bg-red-950/30 border-red-900/30 text-red-300 hover:bg-red-950/50"
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
         >
           <div className="flex items-center gap-2">
             {loading === "debt" ? (
@@ -128,7 +127,7 @@ export function GodMode({ teams, gameState }: GodModeProps) {
               <span className="font-medium text-sm">Foreign Direct Investment</span>
             </div>
             <p className="text-xs text-blue-400/60 mt-1">
-              +1 Tech to Periphery, but 50% profits extracted by Core
+              Proposes FDI — Periphery team votes to accept or reject
             </p>
             {peripheryTeams.length === 0 && (
               <p className="text-xs text-yellow-500 mt-1">No eligible recipients</p>
@@ -181,7 +180,7 @@ export function GodMode({ teams, gameState }: GodModeProps) {
                 {loading === "fdi" ? (
                   <Loader2 className="h-4 w-4 animate-spin mx-auto" />
                 ) : (
-                  "Apply FDI"
+                  "Send Proposal"
                 )}
               </button>
               <button

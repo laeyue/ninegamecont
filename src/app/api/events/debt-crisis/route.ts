@@ -18,20 +18,13 @@ export async function POST() {
       );
     }
 
-    // Halve wealth of all Periphery teams
-    const peripheryTeams = await prisma.team.findMany({
-      where: { tier: Tier.PERIPHERY },
-    });
-
-    const updatedTeams = [];
-    for (const team of peripheryTeams) {
-      const newWealth = Math.floor(team.wealth / 2);
-      const updated = await prisma.team.update({
-        where: { id: team.id },
-        data: { wealth: newWealth },
-      });
-      updatedTeams.push(updated);
-    }
+    // Halve wealth of all Periphery teams atomically
+    const updatedTeams: { id: string; name: string; tier: string; wealth: number; raw_materials: number; tech_level: number; fdi_investor_id: string | null }[] = await prisma.$queryRawUnsafe(`
+      UPDATE "teams"
+      SET "wealth" = FLOOR("wealth" / 2)
+      WHERE "tier" = 'PERIPHERY'
+      RETURNING *
+    `);
 
     // Log the event
     const log = await prisma.gameEventLog.create({
@@ -41,15 +34,26 @@ export async function POST() {
       },
     });
 
+    // Map raw query results back to camelCase Prisma model format
+    const formattedTeams = updatedTeams.map(t => ({
+      id: t.id,
+      name: t.name,
+      tier: t.tier as Tier,
+      wealth: t.wealth,
+      rawMaterials: t.raw_materials,
+      techLevel: t.tech_level,
+      fdiInvestorId: t.fdi_investor_id,
+    }));
+
     // Broadcast updates
-    for (const team of updatedTeams) {
+    for (const team of formattedTeams) {
       sseBroadcaster.emit(SSE_EVENTS.TEAM_UPDATE, { team });
     }
     sseBroadcaster.emit(SSE_EVENTS.EVENT_LOG, { log });
 
     return NextResponse.json({
       success: true,
-      data: { message: "Debt crisis triggered", affectedTeams: updatedTeams.length },
+      data: { message: "Debt crisis triggered", affectedTeams: formattedTeams.length },
     });
   } catch (error) {
     console.error("POST /api/events/debt-crisis error:", error);

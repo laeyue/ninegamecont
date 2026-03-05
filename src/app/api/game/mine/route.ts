@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sseBroadcaster, SSE_EVENTS } from "@/lib/sse";
-import { canMine, getMineCooldownMs } from "@/lib/game-config";
+import { canMine, getMineCooldownMs, MINE_WEALTH_BONUS } from "@/lib/game-config";
 import { sabotageState } from "@/lib/sabotage-state";
 import { checkGameActive, checkMemberRole } from "@/lib/game-guards";
 import type { MineRequest } from "@/types";
@@ -9,7 +9,9 @@ import type { MineRequest } from "@/types";
 export const dynamic = 'force-dynamic';
 
 // In-memory cooldown tracking per player
-const lastMineTime = new Map<string, number>();
+const globalForMine = globalThis as unknown as { lastMineTime: Map<string, number> | undefined };
+const lastMineTime = globalForMine.lastMineTime ?? new Map<string, number>();
+if (process.env.NODE_ENV !== "production") globalForMine.lastMineTime = lastMineTime;
 
 export async function POST(request: NextRequest) {
   try {
@@ -75,10 +77,16 @@ export async function POST(request: NextRequest) {
     // Record cooldown
     lastMineTime.set(memberId, now);
 
-    // Update team
+    // Calculate mine wealth bonus (resource export revenue)
+    const wealthBonus = MINE_WEALTH_BONUS[team.tier] ?? 0;
+
+    // Update team: +1 raw material + direct wealth from resource exports
     const updated = await prisma.team.update({
       where: { id: teamId },
-      data: { rawMaterials: { increment: 1 } },
+      data: {
+        rawMaterials: { increment: 1 },
+        ...(wealthBonus > 0 ? { wealth: { increment: wealthBonus } } : {}),
+      },
     });
 
     // Broadcast update
