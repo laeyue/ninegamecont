@@ -82,10 +82,13 @@ function SellForm({
   memberId: string;
   onClose: () => void;
 }) {
-  const [quantity, setQuantity] = useState(1);
-  const [pricePerUnit, setPricePerUnit] = useState(10);
+  const [quantityInput, setQuantityInput] = useState("1");
+  const [priceInput, setPriceInput] = useState("10");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const parsedQty = Math.max(1, Math.min(parseInt(quantityInput) || 1, team.rawMaterials));
+  const parsedPrice = Math.max(1, parseInt(priceInput) || 1);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,8 +104,8 @@ function SellForm({
           sellerId: team.id,
           memberId,
           itemType: "RAW_MATERIAL",
-          quantity,
-          pricePerUnit,
+          quantity: parsedQty,
+          pricePerUnit: parsedPrice,
         }),
       });
       const data = await res.json();
@@ -130,8 +133,8 @@ function SellForm({
             type="number"
             min={1}
             max={team.rawMaterials}
-            value={quantity}
-            onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+            value={quantityInput}
+            onChange={(e) => setQuantityInput(e.target.value)}
             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gray-500"
           />
         </div>
@@ -140,14 +143,14 @@ function SellForm({
           <input
             type="number"
             min={1}
-            value={pricePerUnit}
-            onChange={(e) => setPricePerUnit(Math.max(1, parseInt(e.target.value) || 1))}
+            value={priceInput}
+            onChange={(e) => setPriceInput(e.target.value)}
             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gray-500"
           />
         </div>
       </div>
       <div className="text-xs text-gray-400 mb-3">
-        Total: ${quantity * pricePerUnit} for {quantity} materials
+        Total: ${parsedQty * parsedPrice} for {parsedQty} materials
       </div>
       {error && (
         <div className="text-red-400 text-xs mb-2">{error}</div>
@@ -163,7 +166,7 @@ function SellForm({
         {loading ? (
           <Loader2 className="h-4 w-4 animate-spin mx-auto" />
         ) : (
-          `List ${quantity} Materials @ $${pricePerUnit}/ea`
+          `List ${parsedQty} Materials @ $${parsedPrice}/ea`
         )}
       </button>
     </form>
